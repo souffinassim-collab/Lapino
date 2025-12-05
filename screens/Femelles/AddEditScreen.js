@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    TextInput,
     ScrollView,
     Alert,
     TouchableOpacity
@@ -20,6 +19,7 @@ import {
 import { formatDateISO, formatDateFR } from '../../utils/dateUtils';
 import { STATUTS_FEMELLE } from '../../utils/constants';
 import CustomButton from '../../components/CustomButton';
+import CustomInput from '../../components/CustomInput';
 
 const AddEditScreen = ({ route, navigation }) => {
     const { femelleId } = route.params || {};
@@ -100,19 +100,12 @@ const AddEditScreen = ({ route, navigation }) => {
     return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.form}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    Numéro * :
-                </Text>
-                <TextInput
-                    style={[styles.input, {
-                        borderColor: colors.border,
-                        color: colors.text,
-                        backgroundColor: colors.surface
-                    }]}
+
+                <CustomInput
+                    label="Numéro *"
                     value={numero}
                     onChangeText={setNumero}
                     placeholder="Ex: F001"
-                    placeholderTextColor={colors.textSecondary}
                 />
 
                 <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -213,21 +206,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         marginTop: 12,
     },
-    input: {
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        fontSize: 16,
-    },
     pickerContainer: {
         borderWidth: 1,
         borderRadius: 8,
+        marginBottom: 16,
     },
     dateButton: {
         borderWidth: 1,
         borderRadius: 8,
         padding: 12,
+        marginBottom: 16,
     },
     saveButton: {
         marginTop: 24,

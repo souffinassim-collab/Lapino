@@ -17,7 +17,7 @@ import {
     getVaccinsBientot,
     getAllAliments,
     getFemellesWithStatus,
-    startCycle,
+    addCycle,
     confirmBirth,
     stopCycle
 } from '../database/db';
@@ -94,7 +94,7 @@ const DashboardScreen = ({ navigation }) => {
 
     const handleStartCycle = async () => {
         if (!selectedFemelle || !dateInput) return;
-        await startCycle(selectedFemelle.id, dateInput);
+        await addCycle(selectedFemelle.id, dateInput);
         setModalDatesVisible(false);
         loadData();
     };
@@ -131,34 +131,34 @@ const DashboardScreen = ({ navigation }) => {
                 </View>
 
                 {/* ALERTES STOCK ALIMENTATION */}
-                {alimentsBas.length > 0 && (
+                {(alimentsBas || []).length > 0 && (
                     <View style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.error }]}>
-                            ⚠️ Aliments Stock Bas ({alimentsBas.length})
+                            ⚠️ Aliments Stock Bas ({(alimentsBas || []).length})
                         </Text>
-                        {alimentsBas.map((item) => (
+                        {(alimentsBas || []).map((item) => (
                             <TouchableOpacity
                                 key={item.id}
                                 style={[styles.alertCard, { borderLeftColor: item.jours_restants < 3 ? colors.error : colors.warning }]}
                                 onPress={() => navigation.navigate('AlimentsScreen')}
                             >
                                 <Text style={styles.alertText}>{item.nom}: Reste {item.jours_restants} jours</Text>
-                                <Text style={styles.alertSubtext}>{item.stock_kg} kg en stock}</Text>
+                                <Text style={styles.alertSubtext}>{item.stock_kg} kg en stock</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
                 )}
 
                 {/* ALERTES VACCINS */}
-                {(vaccinsEnRetard.length > 0 || vaccinsBientot.length > 0) && (
+                {((vaccinsEnRetard || []).length > 0 || (vaccinsBientot || []).length > 0) && (
                     <View style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.error }]}>
-                            Vaccinations ({vaccinsEnRetard.length + vaccinsBientot.length})
+                            Vaccinations ({(vaccinsEnRetard || []).length + (vaccinsBientot || []).length})
                         </Text>
-                        {vaccinsEnRetard.map((item) => (
+                        {(vaccinsEnRetard || []).map((item) => (
                             <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
                         ))}
-                        {vaccinsBientot.map((item) => (
+                        {(vaccinsBientot || []).map((item) => (
                             <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
                         ))}
                     </View>
@@ -168,14 +168,14 @@ const DashboardScreen = ({ navigation }) => {
                 <View style={styles.section}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <Text style={[styles.sectionTitle, { marginHorizontal: 16, marginBottom: 0 }]}>
-                            Mes Lapines ({femelles.length})
+                            Mes Lapines ({(femelles || []).length})
                         </Text>
                         <TouchableOpacity onPress={() => navigation.navigate('FemelleAddEdit')} style={{ marginRight: 16 }}>
                             <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ AJOUTER</Text>
                         </TouchableOpacity>
                     </View>
 
-                    {femelles.map((femelle) => (
+                    {(femelles || []).filter(f => f).map((femelle) => (
                         <View key={femelle.id} style={{ paddingHorizontal: 16 }}>
                             <RabbitStatusCard
                                 femelle={femelle}

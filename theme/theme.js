@@ -14,6 +14,7 @@ const COLORS = {
         warning: '#FF9800',
         success: '#4CAF50',
         border: '#E0E0E0',
+        disabled: '#9E9E9E',
     },
     dark: {
         primary: '#66BB6A',
@@ -27,6 +28,7 @@ const COLORS = {
         warning: '#FF9800',
         success: '#66BB6A',
         border: '#333333',
+        disabled: '#616161',
     },
 };
 
