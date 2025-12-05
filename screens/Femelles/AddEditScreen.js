@@ -5,7 +5,8 @@ import {
     StyleSheet,
     ScrollView,
     Alert,
-    TouchableOpacity
+    TouchableOpacity,
+    Platform
 } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
@@ -32,6 +33,7 @@ const AddEditScreen = ({ route, navigation }) => {
     const [statut, setStatut] = useState('vivante');
     const [clapets, setClapets] = useState([]);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [dateInput, setDateInput] = useState(formatDateFR(new Date(), true));
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -56,7 +58,9 @@ const AddEditScreen = ({ route, navigation }) => {
             setNumero(data.numero);
             setClapatId(data.clapet_id);
             if (data.date_naissance) {
-                setDateNaissance(new Date(data.date_naissance));
+                const d = new Date(data.date_naissance);
+                setDateNaissance(d);
+                setDateInput(formatDateFR(d, true));
             }
             setStatut(data.statut);
         } catch (error) {
@@ -134,53 +138,84 @@ const AddEditScreen = ({ route, navigation }) => {
                 <Text style={[styles.label, { color: colors.textSecondary }]}>
                     Date de naissance:
                 </Text>
-                <TouchableOpacity
-                    style={[styles.dateButton, {
-                        borderColor: colors.border,
-                        backgroundColor: colors.surface
-                    }]}
-                    onPress={() => setShowDatePicker(true)}
-                >
-                    <Text style={{ color: colors.text }}>
-                        {formatDateFR(formatDateISO(dateNaissance))}
-                    </Text>
-                </TouchableOpacity>
 
-                {showDatePicker && (
-                    <DateTimePicker
-                        value={dateNaissance}
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                            setShowDatePicker(false);
-                            if (selectedDate) {
-                                setDateNaissance(selectedDate);
+                {Platform.OS === 'web' ? (
+                    <CustomInput
+                        value={dateInput}
+                        onChangeText={(text) => {
+                            setDateInput(text);
+                            // Validate DD/MM/YYYY
+                            if (text.length === 10) {
+                                const parts = text.split('/');
+                                if (parts.length === 3) {
+                                    const day = parseInt(parts[0], 10);
+                                    const month = parseInt(parts[1], 10) - 1;
+                                    const year = parseInt(parts[2], 10);
+                                    const newDate = new Date(year, month, day);
+
+                                    if (!isNaN(newDate.getTime()) && newDate.getMonth() === month) {
+                                        setDateNaissance(newDate);
+                                    }
+                                }
                             }
                         }}
+                        placeholder="JJ/MM/AAAA"
                     />
+                ) : (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.dateButton, {
+                                borderColor: colors.border,
+                                backgroundColor: colors.surface
+                            }]}
+                            onPress={() => setShowDatePicker(true)}
+                        >
+                            <Text style={{ color: colors.text }}>
+                                {formatDateFR(formatDateISO(dateNaissance))}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={dateNaissance}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowDatePicker(false);
+                                    if (selectedDate) {
+                                        setDateNaissance(selectedDate);
+                                    }
+                                }}
+                            />
+                        )}
+                    </>
                 )}
 
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                    Statut:
-                </Text>
-                <View style={[styles.pickerContainer, {
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface
-                }]}>
-                    <Picker
-                        selectedValue={statut}
-                        onValueChange={setStatut}
-                        style={{ color: colors.text }}
-                    >
-                        {STATUTS_FEMELLE.map((s) => (
-                            <Picker.Item
-                                key={s.value}
-                                label={s.label}
-                                value={s.value}
-                            />
-                        ))}
-                    </Picker>
-                </View>
+                {isEdit && (
+                    <>
+                        <Text style={[styles.label, { color: colors.textSecondary }]}>
+                            Statut:
+                        </Text>
+                        <View style={[styles.pickerContainer, {
+                            borderColor: colors.border,
+                            backgroundColor: colors.surface
+                        }]}>
+                            <Picker
+                                selectedValue={statut}
+                                onValueChange={setStatut}
+                                style={{ color: colors.text }}
+                            >
+                                {STATUTS_FEMELLE.map((s) => (
+                                    <Picker.Item
+                                        key={s.value}
+                                        label={s.label}
+                                        value={s.value}
+                                    />
+                                ))}
+                            </Picker>
+                        </View>
+                    </>
+                )}
 
                 <CustomButton
                     title={isEdit ? 'Modifier' : 'Ajouter'}

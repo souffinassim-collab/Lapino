@@ -7,6 +7,7 @@ import AppNavigator from './navigation/AppNavigator';
 import { lightTheme, darkTheme } from './theme/theme';
 import { initDatabase } from './database/db';
 import ErrorBoundary from './components/ErrorBoundary';
+import { registerForPushNotificationsAsync, scheduleDailyReminder } from './utils/notifications';
 
 export default function App() {
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -27,7 +28,14 @@ export default function App() {
 
             await Promise.race([dbInitPromise, timeoutPromise]);
 
+            await Promise.race([dbInitPromise, timeoutPromise]);
+
             console.log('Database initialized (or timeout)');
+
+            // Notifications setup (Android/iOS)
+            await registerForPushNotificationsAsync();
+            await scheduleDailyReminder();
+
             setIsReady(true);
         } catch (error) {
             console.error('Error preparing app:', error);

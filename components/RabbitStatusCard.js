@@ -40,7 +40,7 @@ const RabbitStatusCard = ({ femelle, onAction }) => {
     // Déterminer le statut, couleur et icône
     let statusConfig = {
         label: 'Repos',
-        icon: 'paw',
+        icon: 'sleep',
         color: colors.disabled,
         progress: 0,
         detail: 'Pas de cycle en cours',
@@ -58,7 +58,8 @@ const RabbitStatusCard = ({ femelle, onAction }) => {
                 icon: 'rabbit',
                 color: '#2196F3', // Bleu
                 progress: progress,
-                detail: daysLeft > 0 ? `Mise bas dans ${daysLeft} jours` : 'Mise bas imminente !',
+                detail: `Gestation confirmée le ${cycle.date_verification || '?'}
+${daysLeft > 0 ? `Mise bas dans ${daysLeft} jours` : 'Mise bas imminente !'}`,
                 actionLabel: 'Déclarer Naissance',
                 actionIcon: 'baby-face-outline'
             };
@@ -67,18 +68,26 @@ const RabbitStatusCard = ({ femelle, onAction }) => {
                 statusConfig.label = 'Saillie';
                 statusConfig.icon = 'heart';
                 statusConfig.color = '#E91E63'; // Rose
+                statusConfig.actionLabel = 'Vérifier Gestation';
+                statusConfig.actionIcon = 'stethoscope';
             }
 
         } else if (cycle.statut === 'allaitante') {
             const daysLeft = getDaysRemaining(cycle.date_sevrage_prevue);
             const progress = calculateProgress(cycle.date_mise_bas_reelle, cycle.date_sevrage_prevue);
 
+            // Calculate elapsed days for segmentation
+            const birth = new Date(cycle.date_mise_bas_reelle);
+            const now = new Date();
+            const elapsed = Math.max(0, Math.floor((now - birth) / (1000 * 60 * 60 * 24)));
+
             statusConfig = {
                 label: 'Allaitante',
-                icon: 'baby-carriage',
+                icon: 'baby-bottle',
                 color: '#4CAF50', // Vert
                 progress: progress,
-                detail: `Sevrage dans ${daysLeft} jours (${cycle.nombre_vivants} petits 🐰)`,
+                daysElapsed: elapsed,
+                detail: `Jour ${elapsed}/35 - ${daysLeft}j restants (${cycle.nombre_vivants} petits 🐰)`,
                 actionLabel: 'Sevrage / Fin',
                 actionIcon: 'check-bold'
             };
@@ -86,7 +95,7 @@ const RabbitStatusCard = ({ femelle, onAction }) => {
     }
 
     return (
-        <Card style={styles.card}>
+        <Card style={[styles.card, { backgroundColor: colors.surface }]}>
             <Card.Content>
                 <View style={styles.header}>
                     <View>
@@ -104,15 +113,55 @@ const RabbitStatusCard = ({ femelle, onAction }) => {
 
                 {cycle && (
                     <View style={styles.progressContainer}>
-                        <View style={styles.progressLabelRow}>
-                            <Text style={styles.detailText}>{statusConfig.detail}</Text>
-                            <Text style={styles.percentText}>{Math.round(statusConfig.progress * 100)}%</Text>
-                        </View>
-                        <ProgressBar
-                            progress={statusConfig.progress}
-                            color={statusConfig.color || colors.disabled}
-                            style={styles.progressBar}
-                        />
+                        {cycle.statut === 'allaitante' ? (
+                            <View>
+                                {/* Informations textuelles */}
+                                <Text style={styles.detailText}>{statusConfig.detail}</Text>
+                                <View style={styles.segmentsRow}>
+                                    {/* Segment 1: 0-11j (Mise au mâle) */}
+                                    <View style={styles.segmentContainer}>
+                                        <View style={[styles.segment, {
+                                            backgroundColor: getSegmentColor(statusConfig.daysElapsed, 0, 11, colors)
+                                        }]} />
+                                        <Text style={styles.segmentLabel}>Mise mâle (11j)</Text>
+                                    </View>
+
+                                    {/* Separator */}
+                                    <View style={styles.segmentSeparator} />
+
+                                    {/* Segment 2: 11-21j (Vérification) */}
+                                    <View style={styles.segmentContainer}>
+                                        <View style={[styles.segment, {
+                                            backgroundColor: getSegmentColor(statusConfig.daysElapsed, 11, 21, colors)
+                                        }]} />
+                                        <Text style={styles.segmentLabel}>Vérif (21j)</Text>
+                                    </View>
+
+                                    {/* Separator */}
+                                    <View style={styles.segmentSeparator} />
+
+                                    {/* Segment 3: 21-35j (Sevrage) */}
+                                    <View style={styles.segmentContainer}>
+                                        <View style={[styles.segment, {
+                                            backgroundColor: getSegmentColor(statusConfig.daysElapsed, 21, 35, colors)
+                                        }]} />
+                                        <Text style={styles.segmentLabel}>Sevrage (35j)</Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                <View style={styles.progressLabelRow}>
+                                    <Text style={styles.detailText}>{statusConfig.detail}</Text>
+                                    <Text style={styles.percentText}>{Math.round(statusConfig.progress * 100)}%</Text>
+                                </View>
+                                <ProgressBar
+                                    progress={statusConfig.progress}
+                                    color={statusConfig.color || colors.disabled}
+                                    style={styles.progressBar}
+                                />
+                            </>
+                        )}
                     </View>
                 )}
 
@@ -148,7 +197,6 @@ const styles = StyleSheet.create({
     card: {
         marginBottom: 12,
         elevation: 2,
-        backgroundColor: 'white',
     },
     header: {
         flexDirection: 'row',
@@ -161,8 +209,8 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     cage: {
-        color: '#757575',
         fontSize: 14,
+        opacity: 0.7,
     },
     progressContainer: {
         marginVertical: 12,
@@ -192,7 +240,38 @@ const styles = StyleSheet.create({
     },
     actionBtn: {
         marginRight: 8,
-    }
+    },
+    segmentsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        height: 30, // Adjust height for labels
+    },
+    segmentContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    segment: {
+        height: 8,
+        width: '100%',
+        borderRadius: 4,
+        marginBottom: 4,
+    },
+    segmentSeparator: {
+        width: 4,
+    },
+    segmentLabel: {
+        fontSize: 10,
+        opacity: 0.7,
+        textAlign: 'center',
+    },
 });
+
+// Helper for segment color
+const getSegmentColor = (elapsed, startDay, endDay, colors) => {
+    if (elapsed >= endDay) return colors.primary; // Completed (Green/Blue usually) or Primary
+    if (elapsed >= startDay) return '#FF9800';   // In progress (Orange)
+    return '#E0E0E0';                            // Future (Grey)
+};
 
 export default RabbitStatusCard;

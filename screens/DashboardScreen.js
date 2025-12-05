@@ -11,6 +11,7 @@ import { useTheme, useFocusEffect } from '@react-navigation/native';
 import StatCard from '../components/StatCard';
 import VaccineAlert from '../components/VaccineAlert';
 import RabbitStatusCard from '../components/RabbitStatusCard';
+import DateInput from '../components/DateInput';
 import {
     getStatistics,
     getVaccinsEnRetard,
@@ -19,7 +20,10 @@ import {
     getFemellesWithStatus,
     addCycle,
     confirmBirth,
-    stopCycle
+    stopCycle,
+    verifyGestation,
+    getDailyCheckStatus,
+    performDailyCheck
 } from '../database/db';
 import { Portal, Modal, Title, TextInput, Button, HelperText, Text as PaperText } from 'react-native-paper';
 
@@ -29,13 +33,15 @@ const DashboardScreen = ({ navigation }) => {
     const [vaccinsEnRetard, setVaccinsEnRetard] = useState([]);
     const [vaccinsBientot, setVaccinsBientot] = useState([]);
     const [alimentsBas, setAlimentsBas] = useState([]);
-    const [femelles, setFemelles] = useState([]); // Liste des femelles pour affichage direct
+    const [femelles, setFemelles] = useState([]);
+    const [dailyCheckDone, setDailyCheckDone] = useState(true); // Default true to avoid flash
     const [refreshing, setRefreshing] = useState(false);
 
     // -- Modal States (identiques à ListScreen pour gérer les actions depuis le Dashboard) --
     const [modalDatesVisible, setModalDatesVisible] = useState(false);
     const [modalBirthVisible, setModalBirthVisible] = useState(false);
     const [modalFailVisible, setModalFailVisible] = useState(false);
+    const [modalVerifyVisible, setModalVerifyVisible] = useState(false); // Verification gestation
     const [selectedFemelle, setSelectedFemelle] = useState(null);
     const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
     const [vivantsInput, setVivantsInput] = useState('');
@@ -47,6 +53,11 @@ const DashboardScreen = ({ navigation }) => {
             setStats(statistics);
             setVaccinsEnRetard(await getVaccinsEnRetard());
             setVaccinsBientot(await getVaccinsBientot());
+
+            // Daily Check
+            const today = new Date().toISOString().split('T')[0];
+            const check = await getDailyCheckStatus(today);
+            setDailyCheckDone(!!check);
 
             const allAliments = await getAllAliments();
             setAlimentsBas(allAliments.filter(a => a.jours_restants <= 7));
@@ -83,7 +94,9 @@ const DashboardScreen = ({ navigation }) => {
 
         if (!femelle.cycle) {
             setModalDatesVisible(true);
-        } else if (femelle.cycle.statut === 'saillie' || femelle.cycle.statut === 'gestante') {
+        } else if (femelle.cycle.statut === 'saillie') {
+            setModalVerifyVisible(true);
+        } else if (femelle.cycle.statut === 'gestante') {
             setVivantsInput('');
             setMortsInput('0');
             setModalBirthVisible(true);
@@ -121,14 +134,7 @@ const DashboardScreen = ({ navigation }) => {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
-                <View style={styles.header}>
-                    <Text style={[styles.title, { color: colors.text }]}>
-                        Tableau de Bord 📊
-                    </Text>
-                    <Text style={{ color: colors.disabled, marginTop: 4 }}>
-                        Vue directe sur vos lapines
-                    </Text>
-                </View>
+                <View style={[styles.header, { paddingBottom: 0, paddingTop: 12 }]} />
 
                 {/* ALERTES STOCK ALIMENTATION */}
                 {(alimentsBas || []).length > 0 && (
@@ -139,11 +145,17 @@ const DashboardScreen = ({ navigation }) => {
                         {(alimentsBas || []).map((item) => (
                             <TouchableOpacity
                                 key={item.id}
-                                style={[styles.alertCard, { borderLeftColor: item.jours_restants < 3 ? colors.error : colors.warning }]}
+                                style={[
+                                    styles.alertCard,
+                                    {
+                                        backgroundColor: colors.surface,
+                                        borderLeftColor: item.jours_restants < 3 ? colors.error : colors.warning
+                                    }
+                                ]}
                                 onPress={() => navigation.navigate('AlimentsScreen')}
                             >
-                                <Text style={styles.alertText}>{item.nom}: Reste {item.jours_restants} jours</Text>
-                                <Text style={styles.alertSubtext}>{item.stock_kg} kg en stock</Text>
+                                <Text style={[styles.alertText, { color: colors.text }]}>{item.nom}: Reste {item.jours_restants} jours</Text>
+                                <Text style={[styles.alertSubtext, { color: colors.textSecondary }]}>{item.stock_kg} kg en stock</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -222,6 +234,31 @@ const DashboardScreen = ({ navigation }) => {
                     <Button mode="contained" color={colors.error} onPress={() => handleStopCycle('echec')} style={styles.button}>Confirmer</Button>
                     <Button onPress={() => setModalFailVisible(false)}>Annuler</Button>
                 </Modal>
+
+                {/* MODAL VERIFICATION GESTATION */}
+                <Modal visible={modalVerifyVisible} onDismiss={() => setModalVerifyVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Vérification Gestation 🩺</Title>
+                    <Text style={{ marginBottom: 16 }}>La lapine est-elle gestante après palpation ?</Text>
+                    <DateInput label="Date Vérification" value={dateInput} onChange={setDateInput} style={styles.input} />
+
+                    <Button
+                        mode="contained"
+                        onPress={() => handleVerifyGestation(true)}
+                        style={[styles.button, { backgroundColor: colors.success }]}
+                        icon="check"
+                    >
+                        OUI - Gestante confirmée
+                    </Button>
+
+                    <Button
+                        mode="contained"
+                        onPress={() => handleVerifyGestation(false)}
+                        style={[styles.button, { backgroundColor: colors.error, marginTop: 12 }]}
+                        icon="close"
+                    >
+                        NON - Echec (Pas de petits)
+                    </Button>
+                </Modal>
             </Portal>
         </View>
     );
@@ -233,9 +270,9 @@ const styles = StyleSheet.create({
     title: { fontSize: 32, fontWeight: 'bold' },
     section: { marginTop: 16, marginBottom: 8 },
     sectionTitle: { fontSize: 18, fontWeight: 'bold' },
-    alertCard: { backgroundColor: 'white', marginHorizontal: 16, marginBottom: 8, padding: 16, borderRadius: 8, borderLeftWidth: 4, elevation: 2 },
-    alertText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-    alertSubtext: { fontSize: 14, color: '#666', marginTop: 4 },
+    alertCard: { marginHorizontal: 16, marginBottom: 8, padding: 16, borderRadius: 8, borderLeftWidth: 4, elevation: 2 },
+    alertText: { fontSize: 16, fontWeight: 'bold' },
+    alertSubtext: { fontSize: 14, marginTop: 4 },
     emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
     modal: { backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8 },
     input: { marginBottom: 12, backgroundColor: 'white' },

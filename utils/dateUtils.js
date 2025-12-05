@@ -20,15 +20,43 @@ export const formatDateISO = (date) => {
 };
 
 // Formater une date en français (DD/MM/YYYY)
-export const formatDateFR = (dateString) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
+export const formatDateFR = (dateString, useDateObject = false) => {
+    // If useDateObject is true, dateString is a Date object
+    let date;
+    if (useDateObject && dateString instanceof Date) {
+        date = dateString;
+    } else {
+        if (!dateString) return '-';
+        date = new Date(dateString);
+    }
+
     if (isNaN(date.getTime())) return '-';
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+};
+
+// Parser une date DD/MM/YYYY vers un objet Date
+export const parseDateFR = (dateString) => {
+    if (!dateString || dateString.length !== 10) return null;
+
+    const parts = dateString.split('/');
+    if (parts.length !== 3) return null;
+
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+    const year = parseInt(parts[2], 10);
+
+    const date = new Date(year, month, day);
+
+    // Validation: check if date is valid and parts match the date
+    // (handles simpler invalid cases like 31/02)
+    if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+        return date;
+    }
+    return null;
 };
 
 // Calculer le nombre de jours entre aujourd'hui et une date
@@ -88,6 +116,7 @@ export default {
     addDays,
     formatDateISO,
     formatDateFR,
+    parseDateFR,
     daysUntil,
     getVaccinationStatus,
     getStatusColor,

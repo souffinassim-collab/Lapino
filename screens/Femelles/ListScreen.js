@@ -3,11 +3,14 @@ import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
 import { FAB, useTheme, Portal, Modal, Text, TextInput, Button, Title, HelperText } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import RabbitStatusCard from '../../components/RabbitStatusCard';
+import DateInput from '../../components/DateInput';
 import {
     getFemellesWithStatus,
     startCycle,
     confirmBirth,
+
     stopCycle,
+    verifyGestation,
     deleteFemelle // Keep regular delete if needed, though hidden behind detail
 } from '../../database/db';
 import { formatDateISO } from '../../utils/dateUtils';
@@ -21,6 +24,7 @@ const FemellesListScreen = ({ navigation }) => {
     const [modalDatesVisible, setModalDatesVisible] = useState(false); // Pour Saillie
     const [modalBirthVisible, setModalBirthVisible] = useState(false); // Pour Naissance
     const [modalFailVisible, setModalFailVisible] = useState(false);   // Pour Echec
+    const [modalVerifyVisible, setModalVerifyVisible] = useState(false);
 
     const [selectedFemelle, setSelectedFemelle] = useState(null);
 
@@ -60,7 +64,10 @@ const FemellesListScreen = ({ navigation }) => {
         if (!femelle.cycle) {
             // Pas de cycle -> Déclarer Saillie
             setModalDatesVisible(true);
-        } else if (femelle.cycle.statut === 'saillie' || femelle.cycle.statut === 'gestante') {
+        } else if (femelle.cycle.statut === 'saillie') {
+            // Saillie -> Vérification
+            setModalVerifyVisible(true);
+        } else if (femelle.cycle.statut === 'gestante') {
             // Gestante -> Déclarer Naissance
             setVivantsInput('');
             setMortsInput('0');
@@ -137,11 +144,10 @@ const FemellesListScreen = ({ navigation }) => {
                 <Modal visible={modalDatesVisible} onDismiss={() => setModalDatesVisible(false)} contentContainerStyle={styles.modal}>
                     <Title>Déclarer Saillie 🌪️</Title>
                     <HelperText type="info">Date de mise au mâle</HelperText>
-                    <TextInput
-                        label="Date (YYYY-MM-DD)"
+                    <DateInput
+                        label="Date Saillie"
                         value={dateInput}
-                        onChangeText={setDateInput}
-                        mode="outlined"
+                        onChange={setDateInput}
                         style={styles.input}
                     />
                     <Button mode="contained" onPress={handleStartCycle} style={styles.button}>Valider</Button>
@@ -199,6 +205,22 @@ const FemellesListScreen = ({ navigation }) => {
                         Confirmer Echec / Fausse Couche
                     </Button>
                     <Button onPress={() => setModalFailVisible(false)} style={{ marginTop: 8 }}>Annuler</Button>
+                </Modal>
+            </Portal>
+
+            {/* MODAL VERIFICATION */}
+            <Portal>
+                <Modal visible={modalVerifyVisible} onDismiss={() => setModalVerifyVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Vérification Gestation 🩺</Title>
+                    <Text style={{ marginBottom: 16 }}>Résultat de la palpation ?</Text>
+                    <TextInput label="Date" value={dateInput} onChangeText={setDateInput} mode="outlined" style={styles.input} />
+
+                    <Button mode="contained" onPress={() => handleVerifyGestation(true)} style={[styles.button, { backgroundColor: colors.success }]}>
+                        OUI - Gestante
+                    </Button>
+                    <Button mode="contained" onPress={() => handleVerifyGestation(false)} style={[styles.button, { backgroundColor: colors.error, marginTop: 12 }]}>
+                        NON - Vide
+                    </Button>
                 </Modal>
             </Portal>
 

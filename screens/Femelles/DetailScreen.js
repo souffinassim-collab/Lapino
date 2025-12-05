@@ -16,7 +16,9 @@ import {
     getVaccinationsByFemelle,
     getAllVaccins,
     addVaccination,
-    deleteFemelle
+    deleteFemelle,
+    getFemelleStats,
+    getFemelleHistory
 } from '../../database/db';
 import { formatDateFR, formatDateISO } from '../../utils/dateUtils';
 import CustomButton from '../../components/CustomButton';
@@ -26,6 +28,8 @@ const FemelleDetailScreen = ({ route, navigation }) => {
     const { colors } = useTheme();
     const [femelle, setFemelle] = useState(null);
     const [vaccinations, setVaccinations] = useState([]);
+    const [stats, setStats] = useState({ total_vivants: 0, total_morts: 0, total_mises_bas: 0 });
+    const [history, setHistory] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [vaccins, setVaccins] = useState([]);
     const [selectedVaccin, setSelectedVaccin] = useState(null);
@@ -39,6 +43,12 @@ const FemelleDetailScreen = ({ route, navigation }) => {
 
             const vaccinationsData = await getVaccinationsByFemelle(femelleId);
             setVaccinations(vaccinationsData);
+
+            const statsData = await getFemelleStats(femelleId);
+            setStats(statsData);
+
+            const historyData = await getFemelleHistory(femelleId);
+            setHistory(historyData);
 
             const vaccinsData = await getAllVaccins();
             setVaccins(vaccinsData);
@@ -150,6 +160,57 @@ const FemelleDetailScreen = ({ route, navigation }) => {
                             {femelle.statut}
                         </Text>
                     </View>
+                </View>
+
+                <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.title, { color: colors.text }]}>
+                        📊 Statistiques
+                    </Text>
+
+                    <View style={styles.statsRow}>
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: colors.primary }]}>{stats.total_mises_bas}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Mises-bas</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: '#4CAF50' }]}>{stats.total_vivants}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Vivants</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                            <Text style={[styles.statValue, { color: '#F44336' }]}>{stats.total_morts}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Morts</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.title, { color: colors.text }]}>
+                        📜 Historique Mises-bas
+                    </Text>
+
+                    {history.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                            Aucun historique disponible
+                        </Text>
+                    ) : (
+                        history.map((cycle) => (
+                            <View key={cycle.id} style={[styles.historyItem, { borderBottomColor: colors.border }]}>
+                                <View style={styles.historyHeader}>
+                                    <Text style={[styles.historyDate, { color: colors.text }]}>
+                                        {formatDateFR(cycle.date_mise_bas_reelle || cycle.date_saillie)}
+                                    </Text>
+                                    <Text style={[styles.historyStatus, { color: cycle.statut === 'echec' ? '#F44336' : colors.primary }]}>
+                                        {cycle.statut === 'echec' ? 'Échec' : 'Terminé'}
+                                    </Text>
+                                </View>
+                                {cycle.statut !== 'echec' && (
+                                    <Text style={[styles.historyDetails, { color: colors.textSecondary }]}>
+                                        {cycle.nombre_vivants} vivants - {cycle.nombre_morts} morts
+                                    </Text>
+                                )}
+                            </View>
+                        ))
+                    )}
                 </View>
 
                 <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -372,6 +433,42 @@ const styles = StyleSheet.create({
     modalButton: {
         flex: 1,
         marginHorizontal: 4,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+    },
+    statItem: {
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    statLabel: {
+        fontSize: 14,
+        marginTop: 4,
+    },
+    historyItem: {
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    historyDate: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    historyStatus: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    historyDetails: {
+        fontSize: 14,
     },
 });
 

@@ -21,7 +21,9 @@ let mockDb = {
         vaccins: 0,
         vaccinations: 0,
         aliments: 0,
-        cycles: 0
+        cycles: 0,
+        daily_checks: 0,
+        settings: 0
     }
 };
 
@@ -29,26 +31,26 @@ let mockDb = {
 const mockDelay = () => new Promise(resolve => setTimeout(resolve, 100));
 
 // === DATABASE HELPER ===
-const executeSqlAsync = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.transaction(tx => {
-            tx.executeSql(
-                sql,
-                params,
-                (_, { rows, insertId, rowsAffected }) => {
-                    resolve({ rows: rows._array, insertId, rowsAffected });
-                },
-                (_, error) => {
-                    console.error(`Error executing SQL: ${sql}`, error);
-                    reject(error);
-                    return false; // Stop transaction
-                }
-            );
-        }, (error) => {
-            console.error("Transaction error:", error);
-            reject(error);
-        });
-    });
+const executeSqlAsync = async (sql, params = []) => {
+    if (!db) {
+        throw new Error("Database not initialized");
+    }
+
+    // Simple detection to distinguish SELECT from INSERT/UPDATE/DELETE
+    const isSelect = /^\s*(SELECT|PRAGMA)/i.test(sql);
+
+    try {
+        if (isSelect) {
+            const rows = await db.getAllAsync(sql, params);
+            return { rows: rows, insertId: null, rowsAffected: 0 };
+        } else {
+            const result = await db.runAsync(sql, params);
+            return { rows: [], insertId: result.lastInsertRowId, rowsAffected: result.changes };
+        }
+    } catch (error) {
+        console.error(`Error executing SQL: ${sql}`, error);
+        throw error;
+    }
 };
 
 // Initialiser la base de données
@@ -58,84 +60,87 @@ export const initDatabase = async () => {
         return Promise.resolve();
     }
 
-    // Ouvrir la base de données SQLite
-    db = await SQLite.openDatabaseAsync('lapino.db');
+    try {
+        // Function to open database sync or async depending on version, 
+        // but SDK 50+ recommends openDatabaseAsync
+        db = await SQLite.openDatabaseAsync('lapino.db');
 
-    const schema = [
-        `CREATE TABLE IF NOT EXISTS clapets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero TEXT UNIQUE NOT NULL
-      );`,
-        `CREATE TABLE IF NOT EXISTS femelles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero TEXT NOT NULL,
-        clapet_id INTEGER,
-        date_naissance TEXT,
-        statut TEXT DEFAULT 'vivante' CHECK(statut IN ('vivante', 'vendue', 'morte')),
-        FOREIGN KEY (clapet_id) REFERENCES clapets(id) ON DELETE SET NULL
-      );`,
-        `CREATE TABLE IF NOT EXISTS vaccins (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom TEXT NOT NULL,
-        duree_jours INTEGER NOT NULL
-      );`,
-        `CREATE TABLE IF NOT EXISTS vaccinations_femelles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        femelle_id INTEGER NOT NULL,
-        vaccin_id INTEGER NOT NULL,
-        date_vaccination TEXT NOT NULL,
-        date_prochain TEXT NOT NULL,
-        FOREIGN KEY (femelle_id) REFERENCES femelles(id) ON DELETE CASCADE,
-        FOREIGN KEY (vaccin_id) REFERENCES vaccins(id) ON DELETE CASCADE
-      );`,
-        'CREATE INDEX IF NOT EXISTS idx_femelles_clapet ON femelles(clapet_id);',
-        'CREATE INDEX IF NOT EXISTS idx_vaccinations_femelle ON vaccinations_femelles(femelle_id);',
-        'CREATE INDEX IF NOT EXISTS idx_vaccinations_date ON vaccinations_femelles(date_prochain);',
-        // Table Aliments
-        `CREATE TABLE IF NOT EXISTS aliments (
+        // Enable FKs
+        await db.execAsync('PRAGMA foreign_keys = ON;');
+
+        const schema = [
+            `CREATE TABLE IF NOT EXISTS clapets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero TEXT UNIQUE NOT NULL
+          );`,
+            `CREATE TABLE IF NOT EXISTS femelles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero TEXT NOT NULL,
+            clapet_id INTEGER,
+            date_naissance TEXT,
+            statut TEXT DEFAULT 'vivante' CHECK(statut IN ('vivante', 'vendue', 'morte')),
+            FOREIGN KEY (clapet_id) REFERENCES clapets(id) ON DELETE SET NULL
+          );`,
+            `CREATE TABLE IF NOT EXISTS vaccins (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom TEXT NOT NULL,
-            stock_kg REAL DEFAULT 0,
-            consommation_g REAL DEFAULT 0
-        );`,
-        // Table Cycles Reproduction
-        `CREATE TABLE IF NOT EXISTS cycles_reproduction (
+            duree_jours INTEGER NOT NULL
+          );`,
+            `CREATE TABLE IF NOT EXISTS vaccinations_femelles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             femelle_id INTEGER NOT NULL,
-            date_saillie TEXT NOT NULL,
-            date_mise_bas_prevue TEXT NOT NULL,
-            date_mise_bas_reelle TEXT,
-            nombre_vivants INTEGER,
-            nombre_morts INTEGER,
-            date_sevrage_prevue TEXT,
-            statut TEXT NOT NULL,
-            FOREIGN KEY (femelle_id) REFERENCES femelles(id) ON DELETE CASCADE
-        );`
-    ];
+            vaccin_id INTEGER NOT NULL,
+            date_vaccination TEXT NOT NULL,
+            date_prochain TEXT NOT NULL,
+            FOREIGN KEY (femelle_id) REFERENCES femelles(id) ON DELETE CASCADE,
+            FOREIGN KEY (vaccin_id) REFERENCES vaccins(id) ON DELETE CASCADE
+          );`,
+            'CREATE INDEX IF NOT EXISTS idx_femelles_clapet ON femelles(clapet_id);',
+            'CREATE INDEX IF NOT EXISTS idx_vaccinations_femelle ON vaccinations_femelles(femelle_id);',
+            'CREATE INDEX IF NOT EXISTS idx_vaccinations_date ON vaccinations_femelles(date_prochain);',
+            // Table Aliments
+            `CREATE TABLE IF NOT EXISTS aliments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                stock_kg REAL DEFAULT 0,
+                consommation_g REAL DEFAULT 0
+            );`,
+            // Table Cycles Reproduction
+            `CREATE TABLE IF NOT EXISTS cycles_reproduction (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                femelle_id INTEGER NOT NULL,
+                date_saillie TEXT NOT NULL,
+                date_mise_bas_prevue TEXT NOT NULL,
+                date_mise_bas_reelle TEXT,
+                nombre_vivants INTEGER,
+                nombre_morts INTEGER,
+                date_sevrage_prevue TEXT,
+                statut TEXT NOT NULL,
+                date_verification TEXT,
+                FOREIGN KEY (femelle_id) REFERENCES femelles(id) ON DELETE CASCADE
+            );`,
+            // Table Daily Checks
+            `CREATE TABLE IF NOT EXISTS daily_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT UNIQUE NOT NULL,
+                statut TEXT NOT NULL
+            );`,
+            // Table Settings
+            `CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );`
+        ];
 
-    return new Promise((resolve, reject) => {
-        db.transaction(tx => {
-            schema.forEach(query => {
-                tx.executeSql(
-                    query,
-                    [],
-                    () => { },
-                    (_, error) => {
-                        console.error('Error init schema:', error);
-                        return false;
-                    }
-                );
-            });
-        },
-            (error) => {
-                console.error('Erreur transaction DB:', error);
-                reject(error);
-            },
-            () => {
-                console.log('Base de données initialisée avec succès');
-                resolve();
-            });
-    });
+        for (const query of schema) {
+            await db.execAsync(query);
+        }
+        console.log('Base de données initialisée avec succès');
+
+    } catch (error) {
+        console.error('Erreur initialisation DB:', error);
+        throw error;
+    }
 };
 
 // ========== CLAPETS ==========
@@ -665,6 +670,67 @@ export const getFemellesWithStatus = async () => {
     return rows;
 };
 
+export const getFemelleStats = async (femelleId) => {
+    if (Platform.OS === 'web') {
+        await mockDelay();
+        if (!mockDb.cycles) mockDb.cycles = [];
+
+        const finishedCycles = mockDb.cycles.filter(c =>
+            c.femelle_id === femelleId &&
+            ['allaitante', 'termine', 'echec'].includes(c.statut)
+        );
+
+        const totalVivants = finishedCycles.reduce((acc, c) => acc + (parseInt(c.nombre_vivants) || 0), 0);
+        const totalMorts = finishedCycles.reduce((acc, c) => acc + (parseInt(c.nombre_morts) || 0), 0);
+        const totalMisesBas = finishedCycles.filter(c => c.date_mise_bas_reelle).length;
+
+        return {
+            total_vivants: totalVivants,
+            total_morts: totalMorts,
+            total_mises_bas: totalMisesBas
+        };
+    }
+
+    const { rows } = await executeSqlAsync(
+        `SELECT 
+            SUM(nombre_vivants) as total_vivants,
+            SUM(nombre_morts) as total_morts,
+            COUNT(CASE WHEN date_mise_bas_reelle IS NOT NULL THEN 1 END) as total_mises_bas
+         FROM cycles_reproduction
+         WHERE femelle_id = ? AND statut IN ('allaitante', 'termine', 'echec')`,
+        [femelleId]
+    );
+
+    return {
+        total_vivants: rows[0].total_vivants || 0,
+        total_morts: rows[0].total_morts || 0,
+        total_mises_bas: rows[0].total_mises_bas || 0
+    };
+};
+
+export const getFemelleHistory = async (femelleId) => {
+    if (Platform.OS === 'web') {
+        await mockDelay();
+        if (!mockDb.cycles) mockDb.cycles = [];
+
+        return mockDb.cycles
+            .filter(c =>
+                c.femelle_id === femelleId &&
+                ['allaitante', 'termine', 'echec'].includes(c.statut)
+            )
+            .sort((a, b) => new Date(b.date_mise_bas_reelle || b.date_saillie) - new Date(a.date_mise_bas_reelle || a.date_saillie));
+    }
+
+    const { rows } = await executeSqlAsync(
+        `SELECT * FROM cycles_reproduction 
+         WHERE femelle_id = ? 
+         AND statut IN ('allaitante', 'termine', 'echec')
+         ORDER BY COALESCE(date_mise_bas_reelle, date_saillie) DESC`,
+        [femelleId]
+    );
+    return rows;
+};
+
 export const addCycle = async (femelleId, dateSaillie) => {
     const dateMiseBasPrevue = formatDateISO(addDays(dateSaillie, 31)); // 31 jours de gestation
 
@@ -737,6 +803,95 @@ export const stopCycle = async (cycleId, reason = 'termine') => {
     await executeSqlAsync(
         'UPDATE cycles_reproduction SET statut = ? WHERE id = ?;',
         [reason, cycleId]
+    );
+};
+
+export const verifyGestation = async (cycleId, dateVerification, isPregnant) => {
+    if (Platform.OS === 'web') {
+        const index = mockDb.cycles.findIndex(c => c.id === cycleId);
+        if (index !== -1) {
+            if (isPregnant) {
+                mockDb.cycles[index].statut = 'gestante';
+                mockDb.cycles[index].date_verification = dateVerification;
+            } else {
+                mockDb.cycles[index].statut = 'echec';
+                mockDb.cycles[index].date_verification = dateVerification;
+            }
+        }
+        return;
+    }
+
+    const statut = isPregnant ? 'gestante' : 'echec';
+    await executeSqlAsync(
+        'UPDATE cycles_reproduction SET statut = ?, date_verification = ? WHERE id = ?;',
+        [statut, dateVerification, cycleId]
+    );
+};
+
+// ========== DAILY CHECKS ==========
+
+export const getDailyCheckStatus = async (date) => {
+    if (Platform.OS === 'web') {
+        await mockDelay();
+        if (!mockDb.daily_checks) mockDb.daily_checks = [];
+        return mockDb.daily_checks.find(c => c.date === date);
+    }
+
+    const { rows } = await executeSqlAsync(
+        'SELECT * FROM daily_checks WHERE date = ?',
+        [date]
+    );
+    return rows[0];
+};
+
+export const performDailyCheck = async (date) => {
+    if (Platform.OS === 'web') {
+        await mockDelay();
+        if (!mockDb.daily_checks) mockDb.daily_checks = [];
+        // Check if exists
+        const exists = mockDb.daily_checks.find(c => c.date === date);
+        if (!exists) {
+            mockDb.lastId.daily_checks++;
+            mockDb.daily_checks.push({
+                id: mockDb.lastId.daily_checks,
+                date,
+                statut: 'ok'
+            });
+        }
+        return;
+    }
+
+    await executeSqlAsync(
+        'INSERT OR IGNORE INTO daily_checks (date, statut) VALUES (?, "ok");',
+        [date]
+    );
+};
+
+// ========== SETTINGS ==========
+
+export const getSetting = async (key) => {
+    if (Platform.OS === 'web') {
+        const setting = (mockDb.settings || []).find(s => s.key === key);
+        return setting ? setting.value : null;
+    }
+    const { rows } = await executeSqlAsync('SELECT value FROM settings WHERE key = ?', [key]);
+    return rows.length > 0 ? rows[0].value : null;
+};
+
+export const saveSetting = async (key, value) => {
+    if (Platform.OS === 'web') {
+        if (!mockDb.settings) mockDb.settings = [];
+        const index = mockDb.settings.findIndex(s => s.key === key);
+        if (index !== -1) {
+            mockDb.settings[index].value = value;
+        } else {
+            mockDb.settings.push({ key, value });
+        }
+        return;
+    }
+    await executeSqlAsync(
+        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+        [key, value]
     );
 };
 

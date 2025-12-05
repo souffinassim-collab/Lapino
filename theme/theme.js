@@ -17,18 +17,18 @@ const COLORS = {
         disabled: '#9E9E9E',
     },
     dark: {
-        primary: '#66BB6A',
-        primaryDark: '#4CAF50',
-        primaryLight: '#81C784',
-        background: '#121212',
-        surface: '#1E1E1E',
-        text: '#FFFFFF',
+        primary: '#81C784',        // Lighter green
+        primaryDark: '#388E3C',
+        primaryLight: '#4CAF50',
+        background: '#121212',     // Keep standard dark
+        surface: '#2C2C2C',        // Lighter surface for cards (was #1E1E1E)
+        text: '#E0E0E0',           // Off-white for better readability preventing eye strain
         textSecondary: '#B0B0B0',
-        error: '#F44336',
-        warning: '#FF9800',
-        success: '#66BB6A',
-        border: '#333333',
-        disabled: '#616161',
+        error: '#EF9A9A',          // Lighter red for visibility on dark
+        warning: '#FFE082',        // Lighter orange
+        success: '#A5D6A7',        // Lighter success
+        border: '#424242',
+        disabled: '#757575',
     },
 };
 
