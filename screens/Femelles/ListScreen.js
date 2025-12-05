@@ -1,103 +1,207 @@
 import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
+import { FAB, useTheme, Portal, Modal, Text, TextInput, Button, Title, HelperText } from 'react-native-paper';
+import { useFocusEffect } from '@react-navigation/native';
+import RabbitStatusCard from '../../components/RabbitStatusCard';
 import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
-    RefreshControl
-} from 'react-native';
-import { useTheme, useFocusEffect } from '@react-navigation/native';
-import { getAllFemelles } from '../../database/db';
-import { formatDateFR, getVaccinationStatus, getStatusColor } from '../../utils/dateUtils';
+    getFemellesWithStatus,
+    startCycle,
+    confirmBirth,
+    stopCycle,
+    deleteFemelle // Keep regular delete if needed, though hidden behind detail
+} from '../../database/db';
+import { formatDateISO } from '../../utils/dateUtils';
 
 const FemellesListScreen = ({ navigation }) => {
     const { colors } = useTheme();
     const [femelles, setFemelles] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
 
-    const loadFemelles = async () => {
+    // Modals state
+    const [modalDatesVisible, setModalDatesVisible] = useState(false); // Pour Saillie
+    const [modalBirthVisible, setModalBirthVisible] = useState(false); // Pour Naissance
+    const [modalFailVisible, setModalFailVisible] = useState(false);   // Pour Echec
+
+    const [selectedFemelle, setSelectedFemelle] = useState(null);
+
+    // Form inputs
+    const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
+    const [vivantsInput, setVivantsInput] = useState('');
+    const [mortsInput, setMortsInput] = useState('0');
+
+    const loadData = async () => {
+        setRefreshing(true);
         try {
-            const data = await getAllFemelles();
+            const data = await getFemellesWithStatus();
             setFemelles(data);
         } catch (error) {
-            console.error('Erreur chargement femelles:', error);
+            console.error(error);
+        } finally {
+            setRefreshing(false);
         }
     };
 
     useFocusEffect(
         useCallback(() => {
-            loadFemelles();
+            loadData();
         }, [])
     );
 
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadFemelles();
-        setRefreshing(false);
+    const handleAction = (femelle, actionType) => {
+        setSelectedFemelle(femelle);
+        setDateInput(new Date().toISOString().split('T')[0]); // Reset date to today
+
+        if (actionType === 'fail') {
+            setModalFailVisible(true);
+            return;
+        }
+
+        // Primary actions based on cycle status
+        if (!femelle.cycle) {
+            // Pas de cycle -> Déclarer Saillie
+            setModalDatesVisible(true);
+        } else if (femelle.cycle.statut === 'saillie' || femelle.cycle.statut === 'gestante') {
+            // Gestante -> Déclarer Naissance
+            setVivantsInput('');
+            setMortsInput('0');
+            setModalBirthVisible(true);
+        } else if (femelle.cycle.statut === 'allaitante') {
+            // Allaitante -> Sevrage (Stop cycle)
+            handleStopCycle('termine');
+        }
     };
 
-    const renderFemelle = ({ item }) => {
-        const status = getVaccinationStatus(item.prochain_vaccin);
-        const statusColor = getStatusColor(status);
+    const handleStartCycle = async () => {
+        if (!selectedFemelle || !dateInput) return;
+        try {
+            await startCycle(selectedFemelle.id, dateInput);
+            setModalDatesVisible(false);
+            loadData();
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
-        return (
-            <TouchableOpacity
-                style={[styles.item, { backgroundColor: colors.surface }]}
-                onPress={() => navigation.navigate('FemelleDetail', {
-                    femelleId: item.id
-                })}
-            >
-                <View style={styles.row}>
-                    <View style={styles.mainInfo}>
-                        <Text style={[styles.numero, { color: colors.text }]}>
-                            🐰 {item.numero}
-                        </Text>
-                        <Text style={[styles.detail, { color: colors.textSecondary }]}>
-                            Clapet: {item.clapet_numero || 'Aucun'}
-                        </Text>
-                    </View>
+    const handleConfirmBirth = async () => {
+        if (!selectedFemelle || !selectedFemelle.cycle || !vivantsInput) return;
+        try {
+            await confirmBirth(
+                selectedFemelle.cycle.id,
+                dateInput,
+                parseInt(vivantsInput),
+                parseInt(mortsInput || 0)
+            );
+            setModalBirthVisible(false);
+            loadData();
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
-                    <View style={styles.vaccineInfo}>
-                        <Text style={[styles.detail, { color: colors.textSecondary }]}>
-                            Dernier: {formatDateFR(item.dernier_vaccin)}
-                        </Text>
-                        <View style={styles.statusRow}>
-                            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                            <Text style={[styles.detail, { color: colors.textSecondary }]}>
-                                Prochain: {formatDateFR(item.prochain_vaccin)}
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            </TouchableOpacity>
-        );
+    const handleStopCycle = async (reason) => {
+        if (!selectedFemelle || !selectedFemelle.cycle) return;
+        try {
+            await stopCycle(selectedFemelle.cycle.id, reason);
+            setModalFailVisible(false); // Ferme si ouvert
+            loadData();
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.container}>
             <FlatList
                 data={femelles}
-                renderItem={renderFemelle}
-                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                    <RabbitStatusCard
+                        femelle={item}
+                        onAction={handleAction}
+                    />
+                )}
+                keyExtractor={item => item.id.toString()}
+                contentContainerStyle={styles.list}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                            Aucune femelle enregistrée
-                        </Text>
-                    </View>
+                    <RefreshControl refreshing={refreshing} onRefresh={loadData} />
                 }
             />
 
-            <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.primary }]}
+            <FAB
+                style={[styles.fab, { backgroundColor: colors.accent }]}
+                icon="plus"
                 onPress={() => navigation.navigate('FemelleAddEdit')}
-            >
-                <Text style={styles.fabText}>+</Text>
-            </TouchableOpacity>
+            />
+
+            {/* MODAL SAILLIE */}
+            <Portal>
+                <Modal visible={modalDatesVisible} onDismiss={() => setModalDatesVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Déclarer Saillie 🌪️</Title>
+                    <HelperText type="info">Date de mise au mâle</HelperText>
+                    <TextInput
+                        label="Date (YYYY-MM-DD)"
+                        value={dateInput}
+                        onChangeText={setDateInput}
+                        mode="outlined"
+                        style={styles.input}
+                    />
+                    <Button mode="contained" onPress={handleStartCycle} style={styles.button}>Valider</Button>
+                </Modal>
+            </Portal>
+
+            {/* MODAL NAISSANCE */}
+            <Portal>
+                <Modal visible={modalBirthVisible} onDismiss={() => setModalBirthVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Carnet Rose 🐰</Title>
+                    <HelperText type="info">Félicitations ! Combien de petits ?</HelperText>
+
+                    <TextInput
+                        label="Date Naissance (YYYY-MM-DD)"
+                        value={dateInput}
+                        onChangeText={setDateInput}
+                        mode="outlined"
+                        style={styles.input}
+                    />
+
+                    <View style={styles.row}>
+                        <TextInput
+                            label="Vivants"
+                            value={vivantsInput}
+                            onChangeText={setVivantsInput}
+                            keyboardType="numeric"
+                            mode="outlined"
+                            style={[styles.input, { flex: 1, marginRight: 8 }]}
+                        />
+                        <TextInput
+                            label="Morts-nés"
+                            value={mortsInput}
+                            onChangeText={setMortsInput}
+                            keyboardType="numeric"
+                            mode="outlined"
+                            style={[styles.input, { flex: 1 }]}
+                        />
+                    </View>
+
+                    <Button mode="contained" onPress={handleConfirmBirth} style={styles.button}>Valider Naissance</Button>
+                </Modal>
+            </Portal>
+
+            {/* MODAL ECHEC */}
+            <Portal>
+                <Modal visible={modalFailVisible} onDismiss={() => setModalFailVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Signaler un problème ⚠️</Title>
+                    <Text style={{ marginBottom: 16 }}>Voulez-vous arrêter le cycle pour "{selectedFemelle?.numero}" ?</Text>
+                    <Button
+                        mode="contained"
+                        color={colors.error}
+                        onPress={() => handleStopCycle('echec')}
+                        style={styles.button}
+                    >
+                        Confirmer Echec / Fausse Couche
+                    </Button>
+                    <Button onPress={() => setModalFailVisible(false)} style={{ marginTop: 8 }}>Annuler</Button>
+                </Modal>
+            </Portal>
+
         </View>
     );
 };
@@ -105,77 +209,35 @@ const FemellesListScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#f5f5f5',
     },
-    item: {
-        marginHorizontal: 16,
-        marginVertical: 6,
+    list: {
         padding: 16,
+        paddingBottom: 80,
+    },
+    fab: {
+        position: 'absolute',
+        margin: 16,
+        right: 0,
+        bottom: 0,
+    },
+    modal: {
+        backgroundColor: 'white',
+        padding: 20,
+        margin: 20,
         borderRadius: 8,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
+    },
+    input: {
+        marginBottom: 12,
+        backgroundColor: 'white',
+    },
+    button: {
+        marginTop: 8,
     },
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-    },
-    mainInfo: {
-        flex: 1,
-    },
-    numero: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    detail: {
-        fontSize: 14,
-        marginTop: 2,
-    },
-    vaccineInfo: {
-        alignItems: 'flex-end',
-    },
-    statusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 2,
-    },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: 6,
-    },
-    emptyState: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 40,
-    },
-    emptyText: {
-        fontSize: 16,
-    },
-    fab: {
-        position: 'absolute',
-        right: 20,
-        bottom: 20,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-    },
-    fabText: {
-        fontSize: 32,
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-    },
+    }
 });
 
 export default FemellesListScreen;

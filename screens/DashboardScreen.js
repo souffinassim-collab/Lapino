@@ -10,33 +10,50 @@ import {
 import { useTheme, useFocusEffect } from '@react-navigation/native';
 import StatCard from '../components/StatCard';
 import VaccineAlert from '../components/VaccineAlert';
+import RabbitStatusCard from '../components/RabbitStatusCard';
 import {
     getStatistics,
     getVaccinsEnRetard,
-    getVaccinsBientot
+    getVaccinsBientot,
+    getAllAliments,
+    getFemellesWithStatus,
+    startCycle,
+    confirmBirth,
+    stopCycle
 } from '../database/db';
+import { Portal, Modal, Title, TextInput, Button, HelperText, Text as PaperText } from 'react-native-paper';
 
 const DashboardScreen = ({ navigation }) => {
     const { colors } = useTheme();
-    const [stats, setStats] = useState({
-        totalFemelles: 0,
-        clapetsRemplis: 0,
-        clapetsVides: 0
-    });
+    const [stats, setStats] = useState({});
     const [vaccinsEnRetard, setVaccinsEnRetard] = useState([]);
     const [vaccinsBientot, setVaccinsBientot] = useState([]);
+    const [alimentsBas, setAlimentsBas] = useState([]);
+    const [femelles, setFemelles] = useState([]); // Liste des femelles pour affichage direct
     const [refreshing, setRefreshing] = useState(false);
+
+    // -- Modal States (identiques à ListScreen pour gérer les actions depuis le Dashboard) --
+    const [modalDatesVisible, setModalDatesVisible] = useState(false);
+    const [modalBirthVisible, setModalBirthVisible] = useState(false);
+    const [modalFailVisible, setModalFailVisible] = useState(false);
+    const [selectedFemelle, setSelectedFemelle] = useState(null);
+    const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
+    const [vivantsInput, setVivantsInput] = useState('');
+    const [mortsInput, setMortsInput] = useState('0');
 
     const loadData = async () => {
         try {
             const statistics = await getStatistics();
             setStats(statistics);
+            setVaccinsEnRetard(await getVaccinsEnRetard());
+            setVaccinsBientot(await getVaccinsBientot());
 
-            const retard = await getVaccinsEnRetard();
-            setVaccinsEnRetard(retard);
+            const allAliments = await getAllAliments();
+            setAlimentsBas(allAliments.filter(a => a.jours_restants <= 7));
 
-            const bientot = await getVaccinsBientot();
-            setVaccinsBientot(bientot);
+            const femellesData = await getFemellesWithStatus();
+            setFemelles(femellesData);
+
         } catch (error) {
             console.error('Erreur chargement données dashboard:', error);
         }
@@ -54,131 +71,176 @@ const DashboardScreen = ({ navigation }) => {
         setRefreshing(false);
     };
 
+    // -- Handlers d'actions (Duplication de logique car le user veut tout sur le dashboard) --
+    const handleAction = (femelle, actionType) => {
+        setSelectedFemelle(femelle);
+        setDateInput(new Date().toISOString().split('T')[0]);
+
+        if (actionType === 'fail') {
+            setModalFailVisible(true);
+            return;
+        }
+
+        if (!femelle.cycle) {
+            setModalDatesVisible(true);
+        } else if (femelle.cycle.statut === 'saillie' || femelle.cycle.statut === 'gestante') {
+            setVivantsInput('');
+            setMortsInput('0');
+            setModalBirthVisible(true);
+        } else if (femelle.cycle.statut === 'allaitante') {
+            handleStopCycle('termine');
+        }
+    };
+
+    const handleStartCycle = async () => {
+        if (!selectedFemelle || !dateInput) return;
+        await startCycle(selectedFemelle.id, dateInput);
+        setModalDatesVisible(false);
+        loadData();
+    };
+
+    const handleConfirmBirth = async () => {
+        if (!selectedFemelle || !selectedFemelle.cycle || !vivantsInput) return;
+        await confirmBirth(selectedFemelle.cycle.id, dateInput, parseInt(vivantsInput), parseInt(mortsInput || 0));
+        setModalBirthVisible(false);
+        loadData();
+    };
+
+    const handleStopCycle = async (reason) => {
+        if (!selectedFemelle || !selectedFemelle.cycle) return;
+        await stopCycle(selectedFemelle.cycle.id, reason);
+        setModalFailVisible(false);
+        loadData();
+    };
+
     return (
-        <ScrollView
-            style={[styles.container, { backgroundColor: colors.background }]}
-            refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-        >
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>
-                    🐰 Gestion Lapins
-                </Text>
-            </View>
+        <View style={{ flex: 1 }}>
+            <ScrollView
+                style={[styles.container, { backgroundColor: colors.background }]}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+            >
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text }]}>
+                        Tableau de Bord 📊
+                    </Text>
+                    <Text style={{ color: colors.disabled, marginTop: 4 }}>
+                        Vue directe sur vos lapines
+                    </Text>
+                </View>
 
-            <View style={styles.statsRow}>
-                <StatCard
-                    icon="🐰"
-                    title="Femelles"
-                    value={stats.totalFemelles}
-                    onPress={() => navigation.navigate('FemellesList')}
-                />
-                <StatCard
-                    icon="🏠"
-                    title="Clapets Remplis"
-                    value={stats.clapetsRemplis}
-                    onPress={() => navigation.navigate('ClapetsList')}
-                />
-            </View>
+                {/* ALERTES STOCK ALIMENTATION */}
+                {alimentsBas.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.error }]}>
+                            ⚠️ Aliments Stock Bas ({alimentsBas.length})
+                        </Text>
+                        {alimentsBas.map((item) => (
+                            <TouchableOpacity
+                                key={item.id}
+                                style={[styles.alertCard, { borderLeftColor: item.jours_restants < 3 ? colors.error : colors.warning }]}
+                                onPress={() => navigation.navigate('AlimentsScreen')}
+                            >
+                                <Text style={styles.alertText}>{item.nom}: Reste {item.jours_restants} jours</Text>
+                                <Text style={styles.alertSubtext}>{item.stock_kg} kg en stock}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
 
-            <View style={styles.statsRow}>
-                <StatCard
-                    icon="📦"
-                    title="Clapets Vides"
-                    value={stats.clapetsVides}
-                />
-                <StatCard
-                    icon="💉"
-                    title="Vaccins"
-                    value={vaccinsEnRetard.length + vaccinsBientot.length}
-                    onPress={() => navigation.navigate('VaccinsList')}
-                />
-            </View>
+                {/* ALERTES VACCINS */}
+                {(vaccinsEnRetard.length > 0 || vaccinsBientot.length > 0) && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: colors.error }]}>
+                            Vaccinations ({vaccinsEnRetard.length + vaccinsBientot.length})
+                        </Text>
+                        {vaccinsEnRetard.map((item) => (
+                            <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
+                        ))}
+                        {vaccinsBientot.map((item) => (
+                            <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
+                        ))}
+                    </View>
+                )}
 
-            {/* Vaccins en retard */}
-            {vaccinsEnRetard.length > 0 && (
+                {/* LISTE DES FEMELLES (DIRECTEMENT SUR DASHBOARD) */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.error }]}>
-                        🔴 Vaccins en Retard ({vaccinsEnRetard.length})
-                    </Text>
-                    {vaccinsEnRetard.map((item) => (
-                        <VaccineAlert
-                            key={item.id}
-                            item={item}
-                            onPress={() => navigation.navigate('FemelleDetail', {
-                                femelleId: item.femelle_id
-                            })}
-                        />
-                    ))}
-                </View>
-            )}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={[styles.sectionTitle, { marginHorizontal: 16, marginBottom: 0 }]}>
+                            Mes Lapines ({femelles.length})
+                        </Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('FemelleAddEdit')} style={{ marginRight: 16 }}>
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ AJOUTER</Text>
+                        </TouchableOpacity>
+                    </View>
 
-            {/* Vaccins à faire bientôt */}
-            {vaccinsBientot.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.warning }]}>
-                        🟠 Vaccins à Faire Bientôt ({vaccinsBientot.length})
-                    </Text>
-                    {vaccinsBientot.map((item) => (
-                        <VaccineAlert
-                            key={item.id}
-                            item={item}
-                            onPress={() => navigation.navigate('FemelleDetail', {
-                                femelleId: item.femelle_id
-                            })}
-                        />
+                    {femelles.map((femelle) => (
+                        <View key={femelle.id} style={{ paddingHorizontal: 16 }}>
+                            <RabbitStatusCard
+                                femelle={femelle}
+                                onAction={handleAction}
+                            />
+                        </View>
                     ))}
-                </View>
-            )}
 
-            {/* Message si tout est OK */}
-            {vaccinsEnRetard.length === 0 && vaccinsBientot.length === 0 && (
-                <View style={styles.emptyState}>
-                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                        ✅ Tous les vaccins sont à jour !
-                    </Text>
+                    {femelles.length === 0 && (
+                        <View style={styles.emptyState}>
+                            <Text style={{ color: colors.disabled }}>Aucune lapine. Cliquez sur + pour commencer.</Text>
+                        </View>
+                    )}
                 </View>
-            )}
-        </ScrollView>
+
+            </ScrollView>
+
+            {/* MODALS POUR ACTIONS RAPIDES */}
+            <Portal>
+                {/* MODAL SAILLIE */}
+                <Modal visible={modalDatesVisible} onDismiss={() => setModalDatesVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Déclarer Saillie 🌪️</Title>
+                    <HelperText type="info">Date de mise au mâle</HelperText>
+                    <TextInput label="Date (YYYY-MM-DD)" value={dateInput} onChangeText={setDateInput} mode="outlined" style={styles.input} />
+                    <Button mode="contained" onPress={handleStartCycle} style={styles.button}>Valider</Button>
+                </Modal>
+
+                {/* MODAL NAISSANCE */}
+                <Modal visible={modalBirthVisible} onDismiss={() => setModalBirthVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Carnet Rose 🐰</Title>
+                    <HelperText type="info">Combien de petits ?</HelperText>
+                    <TextInput label="Date Naissance" value={dateInput} onChangeText={setDateInput} mode="outlined" style={styles.input} />
+                    <View style={styles.row}>
+                        <TextInput label="Vivants" value={vivantsInput} onChangeText={setVivantsInput} keyboardType="numeric" mode="outlined" style={[styles.input, { flex: 1, marginRight: 8 }]} />
+                        <TextInput label="Morts-nés" value={mortsInput} onChangeText={setMortsInput} keyboardType="numeric" mode="outlined" style={[styles.input, { flex: 1 }]} />
+                    </View>
+                    <Button mode="contained" onPress={handleConfirmBirth} style={styles.button}>Valider Naissance</Button>
+                </Modal>
+
+                {/* MODAL ECHEC */}
+                <Modal visible={modalFailVisible} onDismiss={() => setModalFailVisible(false)} contentContainerStyle={styles.modal}>
+                    <Title>Arrêter Cycle ⚠️</Title>
+                    <Text>Confirmer échec/fausse couche ?</Text>
+                    <Button mode="contained" color={colors.error} onPress={() => handleStopCycle('echec')} style={styles.button}>Confirmer</Button>
+                    <Button onPress={() => setModalFailVisible(false)}>Annuler</Button>
+                </Modal>
+            </Portal>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    header: {
-        padding: 20,
-        paddingTop: 10,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-    },
-    statsRow: {
-        flexDirection: 'row',
-        paddingHorizontal: 8,
-    },
-    section: {
-        marginTop: 20,
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginHorizontal: 16,
-        marginBottom: 12,
-    },
-    emptyState: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 40,
-    },
-    emptyText: {
-        fontSize: 16,
-        textAlign: 'center',
-    },
+    container: { flex: 1 },
+    header: { padding: 24, paddingBottom: 10 },
+    title: { fontSize: 32, fontWeight: 'bold' },
+    section: { marginTop: 16, marginBottom: 8 },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+    alertCard: { backgroundColor: 'white', marginHorizontal: 16, marginBottom: 8, padding: 16, borderRadius: 8, borderLeftWidth: 4, elevation: 2 },
+    alertText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+    alertSubtext: { fontSize: 14, color: '#666', marginTop: 4 },
+    emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
+    modal: { backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8 },
+    input: { marginBottom: 12, backgroundColor: 'white' },
+    button: { marginTop: 8 },
+    row: { flexDirection: 'row', justifyContent: 'space-between' }
 });
 
 export default DashboardScreen;

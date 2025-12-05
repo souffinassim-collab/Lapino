@@ -1,7 +1,7 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from '@react-navigation/native';
-import { TouchableOpacity, Text } from 'react-native';
+import { TouchableOpacity, Text, View } from 'react-native';
 
 // Screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -10,6 +10,8 @@ import FemelleDetailScreen from '../screens/Femelles/DetailScreen';
 import FemelleAddEditScreen from '../screens/Femelles/AddEditScreen';
 import ClapletsScreen from '../screens/ClapletsScreen';
 import VaccinsScreen from '../screens/VaccinsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import AlimentsScreen from '../screens/AlimentsScreen';
 
 const Stack = createStackNavigator();
 
@@ -34,14 +36,34 @@ const AppNavigator = ({ toggleTheme }) => {
                 options={({ navigation }) => ({
                     title: 'Accueil',
                     headerRight: () => (
-                        <TouchableOpacity
-                            onPress={toggleTheme}
-                            style={{ marginRight: 16 }}
-                        >
-                            <Text style={{ fontSize: 24 }}>🌓</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row' }}>
+                            <TouchableOpacity
+                                onPress={toggleTheme}
+                                style={{ marginRight: 16 }}
+                            >
+                                <Text style={{ fontSize: 24 }}>🌓</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('Settings')}
+                                style={{ marginRight: 16 }}
+                            >
+                                <Text style={{ fontSize: 24 }}>⚙️</Text>
+                            </TouchableOpacity>
+                        </View>
                     ),
                 })}
+            />
+
+            <Stack.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{ title: 'Réglages' }}
+            />
+
+            <Stack.Screen
+                name="AlimentsList"
+                component={AlimentsScreen}
+                options={{ title: 'Gestion Alimentation' }}
             />
 
             <Stack.Screen
