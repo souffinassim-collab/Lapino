@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,65 +8,53 @@ import {
     TouchableOpacity
 } from 'react-native';
 import { useTheme, useFocusEffect } from '@react-navigation/native';
+import { Card, Chip, Button } from 'react-native-paper';
 import StatCard from '../components/StatCard';
 import VaccineAlert from '../components/VaccineAlert';
 import RabbitStatusCard from '../components/RabbitStatusCard';
-import DateInput from '../components/DateInput';
+import ReproductionModals from '../components/ReproductionModals';
 import {
     getStatistics,
     getVaccinsEnRetard,
     getVaccinsBientot,
     getAllAliments,
     getFemellesWithStatus,
-    addCycle,
-    confirmBirth,
-    stopCycle,
-    verifyGestation,
-    getDailyCheckStatus,
-    performDailyCheck
+    getReproductionAlerts
 } from '../database/db';
-import { Portal, Modal, Title, TextInput, Button, HelperText, Text as PaperText } from 'react-native-paper';
 
 const DashboardScreen = ({ navigation }) => {
     const { colors } = useTheme();
     const [stats, setStats] = useState({});
+    const [reproAlerts, setReproAlerts] = useState({ palpations: [], boitesNid: [], misesBas: [], sevrages: [] });
     const [vaccinsEnRetard, setVaccinsEnRetard] = useState([]);
     const [vaccinsBientot, setVaccinsBientot] = useState([]);
     const [alimentsBas, setAlimentsBas] = useState([]);
     const [femelles, setFemelles] = useState([]);
-    const [dailyCheckDone, setDailyCheckDone] = useState(true); // Default true to avoid flash
     const [refreshing, setRefreshing] = useState(false);
 
-    // -- Modal States (identiques à ListScreen pour gérer les actions depuis le Dashboard) --
-    const [modalDatesVisible, setModalDatesVisible] = useState(false);
-    const [modalBirthVisible, setModalBirthVisible] = useState(false);
-    const [modalFailVisible, setModalFailVisible] = useState(false);
-    const [modalVerifyVisible, setModalVerifyVisible] = useState(false); // Verification gestation
+    // Modal reproduction unifié
+    const [activeModal, setActiveModal] = useState(null);
     const [selectedFemelle, setSelectedFemelle] = useState(null);
-    const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0]);
-    const [vivantsInput, setVivantsInput] = useState('');
-    const [mortsInput, setMortsInput] = useState('0');
 
     const loadData = async () => {
         try {
-            const statistics = await getStatistics();
+            const [statistics, alerts, vRetard, vBientot, allAliments, femellesData] = await Promise.all([
+                getStatistics(),
+                getReproductionAlerts(),
+                getVaccinsEnRetard(),
+                getVaccinsBientot(),
+                getAllAliments(),
+                getFemellesWithStatus()
+            ]);
+
             setStats(statistics);
-            setVaccinsEnRetard(await getVaccinsEnRetard());
-            setVaccinsBientot(await getVaccinsBientot());
-
-            // Daily Check
-            const today = new Date().toISOString().split('T')[0];
-            const check = await getDailyCheckStatus(today);
-            setDailyCheckDone(!!check);
-
-            const allAliments = await getAllAliments();
+            setReproAlerts(alerts);
+            setVaccinsEnRetard(vRetard);
+            setVaccinsBientot(vBientot);
             setAlimentsBas(allAliments.filter(a => a.jours_restants <= 7));
-
-            const femellesData = await getFemellesWithStatus();
             setFemelles(femellesData);
-
         } catch (error) {
-            console.error('Erreur chargement données dashboard:', error);
+            console.error('Erreur chargement dashboard:', error);
         }
     };
 
@@ -82,67 +70,140 @@ const DashboardScreen = ({ navigation }) => {
         setRefreshing(false);
     };
 
-    // -- Handlers d'actions (Duplication de logique car le user veut tout sur le dashboard) --
     const handleAction = (femelle, actionType) => {
         setSelectedFemelle(femelle);
-        setDateInput(new Date().toISOString().split('T')[0]);
-
-        if (actionType === 'fail') {
-            setModalFailVisible(true);
-            return;
-        }
-
-        if (!femelle.cycle) {
-            setModalDatesVisible(true);
-        } else if (femelle.cycle.statut === 'saillie') {
-            setModalVerifyVisible(true);
-        } else if (femelle.cycle.statut === 'gestante') {
-            setVivantsInput('');
-            setMortsInput('0');
-            setModalBirthVisible(true);
-        } else if (femelle.cycle.statut === 'allaitante') {
-            handleStopCycle('termine');
-        }
+        setActiveModal(actionType);
     };
 
-    const handleStartCycle = async () => {
-        if (!selectedFemelle || !dateInput) return;
-        await addCycle(selectedFemelle.id, dateInput);
-        setModalDatesVisible(false);
-        loadData();
+    const handleCardPress = (femelle) => {
+        navigation.navigate('FemelleDetail', { femelleId: femelle.id });
     };
 
-    const handleConfirmBirth = async () => {
-        if (!selectedFemelle || !selectedFemelle.cycle || !vivantsInput) return;
-        await confirmBirth(selectedFemelle.cycle.id, dateInput, parseInt(vivantsInput), parseInt(mortsInput || 0));
-        setModalBirthVisible(false);
-        loadData();
-    };
-
-    const handleStopCycle = async (reason) => {
-        if (!selectedFemelle || !selectedFemelle.cycle) return;
-        await stopCycle(selectedFemelle.cycle.id, reason);
-        setModalFailVisible(false);
-        loadData();
-    };
+    const totalCuniAlerts =
+        reproAlerts.palpations.length +
+        reproAlerts.boitesNid.length +
+        reproAlerts.misesBas.length +
+        reproAlerts.sevrages.length;
 
     return (
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
             <ScrollView
-                style={[styles.container, { backgroundColor: colors.background }]}
+                style={styles.container}
+                contentContainerStyle={styles.contentContainer}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
             >
-                <View style={[styles.header, { paddingBottom: 0, paddingTop: 12 }]} />
+                {/* 1. RÉSUMÉ DU CHEPTEL & REPRODUCTION */}
+                <View style={styles.statsRow}>
+                    <StatCard
+                        title="Lapines Total"
+                        value={stats.totalFemelles || 0}
+                        icon="rabbit"
+                        color={colors.primary}
+                    />
+                    <StatCard
+                        title="Lapereaux au nid"
+                        value={stats.lapereauxSousMere || 0}
+                        icon="baby-bottle"
+                        color="#4CAF50"
+                    />
+                </View>
 
-                {/* ALERTES STOCK ALIMENTATION */}
-                {(alimentsBas || []).length > 0 && (
+                {/* Micro-indicateurs d'état de reproduction */}
+                <View style={styles.statusChipsRow}>
+                    <Chip icon="sleep" style={styles.miniChip}>Repos: {stats.enRepos || 0}</Chip>
+                    <Chip icon="heart" style={[styles.miniChip, { backgroundColor: '#FCE4EC' }]}>Saillie: {stats.enSaillie || 0}</Chip>
+                    <Chip icon="rabbit" style={[styles.miniChip, { backgroundColor: '#E3F2FD' }]}>Gestante: {stats.gestantes || 0}</Chip>
+                    <Chip icon="baby-bottle" style={[styles.miniChip, { backgroundColor: '#E8F5E9' }]}>Allaitante: {stats.allaitantes || 0}</Chip>
+                </View>
+
+                {/* 2. ALERTES CUNICULICOLES PRIORITAIRES */}
+                {totalCuniAlerts > 0 && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionTitle, { color: '#E65100' }]}>
+                            🚨 Actions Élevage Prioritaires ({totalCuniAlerts})
+                        </Text>
+
+                        {/* Palpations à faire */}
+                        {reproAlerts.palpations.map((item, idx) => (
+                            <TouchableOpacity
+                                key={`palp-${idx}`}
+                                style={[styles.alertCard, styles.alertPalpation]}
+                                onPress={() => handleAction(item.femelle, 'verify')}
+                            >
+                                <View style={styles.alertHeader}>
+                                    <Text style={styles.alertCardTitle}>🩺 {item.femelle.numero} • Palpation à faire !</Text>
+                                    <Chip compact style={{ backgroundColor: '#FFE0B2' }}>J{item.daysSinceSaillie}</Chip>
+                                </View>
+                                <Text style={styles.alertCardSub}>
+                                    Saillie le {item.cycle.date_saillie} {item.cycle.male_numero ? `avec ${item.cycle.male_numero}` : ''}. Diagnostic de gestation à réaliser.
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Boîtes à nid à poser */}
+                        {reproAlerts.boitesNid.map((item, idx) => (
+                            <TouchableOpacity
+                                key={`nest-${idx}`}
+                                style={[styles.alertCard, styles.alertNest]}
+                                onPress={() => handleAction(item.femelle, 'nest')}
+                            >
+                                <View style={styles.alertHeader}>
+                                    <Text style={[styles.alertCardTitle, { color: '#B71C1C' }]}>
+                                        📦 {item.femelle.numero} • Poser la boîte à nid !
+                                    </Text>
+                                    <Chip compact style={{ backgroundColor: '#FFCDD2' }}>Urgent J28</Chip>
+                                </View>
+                                <Text style={styles.alertCardSub}>
+                                    Mise bas imminente ! Garnir le nid de paille propre pour éviter la perte des petits sur le grillage.
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Mises bas imminentes */}
+                        {reproAlerts.misesBas.map((item, idx) => (
+                            <TouchableOpacity
+                                key={`birth-${idx}`}
+                                style={[styles.alertCard, styles.alertBirth]}
+                                onPress={() => handleAction(item.femelle, 'birth')}
+                            >
+                                <View style={styles.alertHeader}>
+                                    <Text style={styles.alertCardTitle}>🐰 {item.femelle.numero} • {item.message}</Text>
+                                    <Chip compact style={{ backgroundColor: '#E1BEE7' }}>Naissance</Chip>
+                                </View>
+                                <Text style={styles.alertCardSub}>
+                                    Surveiller le nid et déclarer la naissance dès que les petits sont arrivés.
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+
+                        {/* Sevrages à réaliser */}
+                        {reproAlerts.sevrages.map((item, idx) => (
+                            <TouchableOpacity
+                                key={`wean-${idx}`}
+                                style={[styles.alertCard, styles.alertWean]}
+                                onPress={() => handleAction(item.femelle, 'wean')}
+                            >
+                                <View style={styles.alertHeader}>
+                                    <Text style={styles.alertCardTitle}>🧺 {item.femelle.numero} • {item.message}</Text>
+                                    <Chip compact style={{ backgroundColor: '#C8E6C9' }}>Sevrage</Chip>
+                                </View>
+                                <Text style={styles.alertCardSub}>
+                                    Les lapereaux ont l'âge d'être sevrés et transférés en engraissement.
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
+                {/* 3. ALERTES STOCK ALIMENTATION */}
+                {alimentsBas.length > 0 && (
                     <View style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.error }]}>
-                            ⚠️ Aliments Stock Bas ({(alimentsBas || []).length})
+                            ⚠️ Aliments Stock Bas ({alimentsBas.length})
                         </Text>
-                        {(alimentsBas || []).map((item) => (
+                        {alimentsBas.map((item) => (
                             <TouchableOpacity
                                 key={item.id}
                                 style={[
@@ -152,7 +213,7 @@ const DashboardScreen = ({ navigation }) => {
                                         borderLeftColor: item.jours_restants < 3 ? colors.error : colors.warning
                                     }
                                 ]}
-                                onPress={() => navigation.navigate('AlimentsScreen')}
+                                onPress={() => navigation.navigate('AlimentsList')}
                             >
                                 <Text style={[styles.alertText, { color: colors.text }]}>{item.nom}: Reste {item.jours_restants} jours</Text>
                                 <Text style={[styles.alertSubtext, { color: colors.textSecondary }]}>{item.stock_kg} kg en stock</Text>
@@ -161,123 +222,149 @@ const DashboardScreen = ({ navigation }) => {
                     </View>
                 )}
 
-                {/* ALERTES VACCINS */}
-                {((vaccinsEnRetard || []).length > 0 || (vaccinsBientot || []).length > 0) && (
+                {/* 4. ALERTES VACCINS */}
+                {(vaccinsEnRetard.length > 0 || vaccinsBientot.length > 0) && (
                     <View style={styles.section}>
                         <Text style={[styles.sectionTitle, { color: colors.error }]}>
-                            Vaccinations ({(vaccinsEnRetard || []).length + (vaccinsBientot || []).length})
+                            💉 Vaccinations ({vaccinsEnRetard.length + vaccinsBientot.length})
                         </Text>
-                        {(vaccinsEnRetard || []).map((item) => (
+                        {vaccinsEnRetard.map((item) => (
                             <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
                         ))}
-                        {(vaccinsBientot || []).map((item) => (
+                        {vaccinsBientot.map((item) => (
                             <VaccineAlert key={item.id} item={item} onPress={() => navigation.navigate('FemelleDetail', { femelleId: item.femelle_id })} />
                         ))}
                     </View>
                 )}
 
-                {/* LISTE DES FEMELLES (DIRECTEMENT SUR DASHBOARD) */}
+                {/* 5. GESTION DU CHEPTEL (MES LAPINES) */}
                 <View style={styles.section}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <Text style={[styles.sectionTitle, { marginHorizontal: 16, marginBottom: 0 }]}>
-                            Mes Lapines ({(femelles || []).length})
+                    <View style={styles.sectionHeaderRow}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                            Mes Lapines ({femelles.length})
                         </Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('FemelleAddEdit')} style={{ marginRight: 16 }}>
-                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>+ AJOUTER</Text>
-                        </TouchableOpacity>
+                        <Button
+                            mode="text"
+                            compact
+                            icon="plus"
+                            onPress={() => navigation.navigate('FemelleAddEdit')}
+                        >
+                            Ajouter
+                        </Button>
                     </View>
 
-                    {(femelles || []).filter(f => f).map((femelle) => (
-                        <View key={femelle.id} style={{ paddingHorizontal: 16 }}>
-                            <RabbitStatusCard
-                                femelle={femelle}
-                                onAction={handleAction}
-                            />
-                        </View>
+                    {femelles.map((femelle) => (
+                        <RabbitStatusCard
+                            key={femelle.id}
+                            femelle={femelle}
+                            onAction={handleAction}
+                            onPressCard={handleCardPress}
+                        />
                     ))}
 
                     {femelles.length === 0 && (
                         <View style={styles.emptyState}>
-                            <Text style={{ color: colors.disabled }}>Aucune lapine. Cliquez sur + pour commencer.</Text>
+                            <Text style={{ color: colors.disabled, textAlign: 'center' }}>
+                                Aucune lapine enregistrée. Cliquez sur "Ajouter" pour créer votre cheptel reproducteur.
+                            </Text>
                         </View>
                     )}
                 </View>
-
             </ScrollView>
 
-            {/* MODALS POUR ACTIONS RAPIDES */}
-            <Portal>
-                {/* MODAL SAILLIE */}
-                <Modal visible={modalDatesVisible} onDismiss={() => setModalDatesVisible(false)} contentContainerStyle={styles.modal}>
-                    <Title>Déclarer Saillie 🌪️</Title>
-                    <HelperText type="info">Date de mise au mâle</HelperText>
-                    <TextInput label="Date (YYYY-MM-DD)" value={dateInput} onChangeText={setDateInput} mode="outlined" style={styles.input} />
-                    <Button mode="contained" onPress={handleStartCycle} style={styles.button}>Valider</Button>
-                </Modal>
-
-                {/* MODAL NAISSANCE */}
-                <Modal visible={modalBirthVisible} onDismiss={() => setModalBirthVisible(false)} contentContainerStyle={styles.modal}>
-                    <Title>Carnet Rose 🐰</Title>
-                    <HelperText type="info">Combien de petits ?</HelperText>
-                    <TextInput label="Date Naissance" value={dateInput} onChangeText={setDateInput} mode="outlined" style={styles.input} />
-                    <View style={styles.row}>
-                        <TextInput label="Vivants" value={vivantsInput} onChangeText={setVivantsInput} keyboardType="numeric" mode="outlined" style={[styles.input, { flex: 1, marginRight: 8 }]} />
-                        <TextInput label="Morts-nés" value={mortsInput} onChangeText={setMortsInput} keyboardType="numeric" mode="outlined" style={[styles.input, { flex: 1 }]} />
-                    </View>
-                    <Button mode="contained" onPress={handleConfirmBirth} style={styles.button}>Valider Naissance</Button>
-                </Modal>
-
-                {/* MODAL ECHEC */}
-                <Modal visible={modalFailVisible} onDismiss={() => setModalFailVisible(false)} contentContainerStyle={styles.modal}>
-                    <Title>Arrêter Cycle ⚠️</Title>
-                    <Text>Confirmer échec/fausse couche ?</Text>
-                    <Button mode="contained" color={colors.error} onPress={() => handleStopCycle('echec')} style={styles.button}>Confirmer</Button>
-                    <Button onPress={() => setModalFailVisible(false)}>Annuler</Button>
-                </Modal>
-
-                {/* MODAL VERIFICATION GESTATION */}
-                <Modal visible={modalVerifyVisible} onDismiss={() => setModalVerifyVisible(false)} contentContainerStyle={styles.modal}>
-                    <Title>Vérification Gestation 🩺</Title>
-                    <Text style={{ marginBottom: 16 }}>La lapine est-elle gestante après palpation ?</Text>
-                    <DateInput label="Date Vérification" value={dateInput} onChange={setDateInput} style={styles.input} />
-
-                    <Button
-                        mode="contained"
-                        onPress={() => handleVerifyGestation(true)}
-                        style={[styles.button, { backgroundColor: colors.success }]}
-                        icon="check"
-                    >
-                        OUI - Gestante confirmée
-                    </Button>
-
-                    <Button
-                        mode="contained"
-                        onPress={() => handleVerifyGestation(false)}
-                        style={[styles.button, { backgroundColor: colors.error, marginTop: 12 }]}
-                        icon="close"
-                    >
-                        NON - Echec (Pas de petits)
-                    </Button>
-                </Modal>
-            </Portal>
+            {/* MODALS REPRODUCTION CUNICULICOLE */}
+            <ReproductionModals
+                activeModal={activeModal}
+                femelle={selectedFemelle}
+                onClose={() => {
+                    setActiveModal(null);
+                    setSelectedFemelle(null);
+                }}
+                onSuccess={loadData}
+            />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { padding: 24, paddingBottom: 10 },
-    title: { fontSize: 32, fontWeight: 'bold' },
-    section: { marginTop: 16, marginBottom: 8 },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold' },
-    alertCard: { marginHorizontal: 16, marginBottom: 8, padding: 16, borderRadius: 8, borderLeftWidth: 4, elevation: 2 },
-    alertText: { fontSize: 16, fontWeight: 'bold' },
-    alertSubtext: { fontSize: 14, marginTop: 4 },
-    emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
-    modal: { backgroundColor: 'white', padding: 20, margin: 20, borderRadius: 8 },
-    input: { marginBottom: 12, backgroundColor: 'white' },
-    button: { marginTop: 8 },
-    row: { flexDirection: 'row', justifyContent: 'space-between' }
+    contentContainer: { padding: 16, paddingBottom: 60 },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    statusChipsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 14,
+    },
+    miniChip: {
+        height: 32,
+    },
+    section: {
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 17,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    alertCard: {
+        padding: 12,
+        borderRadius: 8,
+        borderLeftWidth: 4,
+        marginBottom: 8,
+        backgroundColor: '#FFFFFF',
+        elevation: 1,
+    },
+    alertPalpation: {
+        borderLeftColor: '#F57C00',
+        backgroundColor: '#FFF8E1',
+    },
+    alertNest: {
+        borderLeftColor: '#D32F2F',
+        backgroundColor: '#FFEBEE',
+    },
+    alertBirth: {
+        borderLeftColor: '#8E24AA',
+        backgroundColor: '#F3E5F5',
+    },
+    alertWean: {
+        borderLeftColor: '#388E3C',
+        backgroundColor: '#E8F5E9',
+    },
+    alertHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    alertCardTitle: {
+        fontSize: 14.5,
+        fontWeight: 'bold',
+        flex: 1,
+    },
+    alertCardSub: {
+        fontSize: 12.5,
+        color: '#555',
+        marginTop: 4,
+    },
+    alertText: { fontSize: 15, fontWeight: 'bold' },
+    alertSubtext: { fontSize: 13, marginTop: 2 },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 30,
+        backgroundColor: '#FAFAFA',
+        borderRadius: 8,
+    },
 });
 
 export default DashboardScreen;

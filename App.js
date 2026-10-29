@@ -22,11 +22,8 @@ export default function App() {
             console.log('Starting DB Init...');
 
             // Sécurité: Si la DB met trop de temps, on force le démarrage quand même
-            // Cela évite de rester bloqué sur l'écran de chargement
             const dbInitPromise = initDatabase();
             const timeoutPromise = new Promise(resolve => setTimeout(resolve, 3000));
-
-            await Promise.race([dbInitPromise, timeoutPromise]);
 
             await Promise.race([dbInitPromise, timeoutPromise]);
 
