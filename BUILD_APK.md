@@ -20,6 +20,7 @@ Double-cliquez simplement sur le script situé à la racine du projet :
 3. Compilation optimisée avec minification de code R8 (`gradlew.bat assembleRelease`).
 4. Relance automatique (jusqu'à 5 tentatives) en cas de micro-coupure réseau liée au pare-feu.
 5. Copie de l'APK finale directement à la racine : **`Lapino.apk`**.
+6. **Ouverture automatique** de l'Explorateur Windows avec le fichier `Lapino.apk` sélectionné dès la fin de la génération.
 
 ---
 

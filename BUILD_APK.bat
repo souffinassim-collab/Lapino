@@ -58,6 +58,9 @@ if exist "%APK_SOURCE%" (
     echo   ✅ SUCCÈS ! APK générée et optimisée avec succès :
     echo   📦 Fichier : %~dp0Lapino.apk
     echo ========================================================
+    echo.
+    echo [INFO] Ouverture automatique du dossier de génération...
+    explorer /select,"%~dp0Lapino.apk"
 ) else (
     echo [ERREUR] Fichier APK introuvable dans %APK_SOURCE%.
 )
