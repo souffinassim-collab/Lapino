@@ -1,86 +1,30 @@
-# Instructions Build APK
+# Guide de Compilation de l'APK Lapino (`Lapino.apk`)
 
-## Méthode Recommandée: EAS Build (Cloud)
+L'application **Lapino** est une application **100 % Native Android** conçue en **Kotlin**, **Jetpack Compose (Material 3)** et **SQLite natif**, optimisée par le compilateur **R8**.
 
-### 1. Installation d'EAS CLI
+- **Taille de l'APK** : **~0,96 Mo (< 1 Mo)**
+- **Compatibilité** : **Android 7.0 (API 24) à Android 16 (API 36)**
+- **Fluidité** : 60 / 120 fps même sur smartphones d'entrée de gamme
+- **Mode hors-ligne** : 100 % autonome, aucune dépendance serveur
 
-```bash
-npm install -g eas-cli
-```
+---
 
-### 2. Connexion à Expo
+## 🚀 Compiler l'APK en 1 Clic (Local)
 
-```bash
-eas login
-```
+Double-cliquez simplement sur le script situé à la racine du projet :
+👉 [**`BUILD_APK.bat`**](file:///d:/Mes%20Projets/CURSOR/Lapino/BUILD_APK.bat)
 
-Si vous n'avez pas de compte, créez-en un gratuitement sur https://expo.dev
+### Fonctionnement du script :
+1. Détection et configuration automatique du **JDK 17** (`Eclipse Adoptium\jdk-17` ou `Java\jdk-21`).
+2. Détection du **SDK Android** (`%LOCALAPPDATA%\Android\Sdk`).
+3. Compilation optimisée avec minification de code R8 (`gradlew.bat assembleRelease`).
+4. Relance automatique (jusqu'à 5 tentatives) en cas de micro-coupure réseau liée au pare-feu.
+5. Copie de l'APK finale directement à la racine : **`Lapino.apk`**.
 
-### 3. Configuration du projet
+---
 
-```bash
-eas build:configure
-```
+## 💻 Ouverture dans Android Studio
 
-### 4. Build de l'APK
-
-```bash
-eas build --platform android --profile production
-```
-
-### 5. Téléchargement
-
-Attendez la fin du build (10-15 minutes). Un lien sera fourni pour télécharger l'APK.
-
-## Méthode Alternative: Build Local
-
-⚠️ **Plus complexe** - Nécessite Android Studio
-
-### 1. Prérequis
-
-- Android Studio installé
-- Android SDK configuré
-- Variable d'environnement `ANDROID_HOME` définie
-
-### 2. Prebuild
-
-```bash
-npx expo prebuild
-```
-
-### 3. Build
-
-```bash
-cd android
-./gradlew assembleRelease
-```
-
-### 4. APK
-
-L'APK sera dans: `android/app/build/outputs/apk/release/app-release.apk`
-
-## Signature de l'APK (Production)
-
-Pour publier sur le Play Store, vous devrez signer l'APK:
-
-1. Générez une clé de signature via EAS
-2. Configurez les credentials dans `eas.json`
-3. Build avec le profil production
-
-## Tester l'APK
-
-1. Transférez l'APK sur votre appareil Android
-2. Activez "Sources inconnues" dans les paramètres
-3. Installez l'APK
-4. Testez toutes les fonctionnalités
-
-## APK vs AAB
-
-- **APK**: Pour distribution directe, test
-- **AAB** (Android App Bundle): Pour Google Play Store
-
-Pour AAB:
-```bash
-eas build --platform android --profile production
-```
-Puis modifiez `eas.json` pour utiliser `buildType: "aab"`
+Ouvrez simplement le dossier racine `Lapino` dans Android Studio :
+1. Android Studio détectera automatiquement `settings.gradle.kts` et synchronisera le projet Gradle.
+2. Cliquez sur **Run 'app'** (bouton vert ▶) pour lancer l'application sur votre smartphone ou émulateur.

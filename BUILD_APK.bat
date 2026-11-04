@@ -7,7 +7,7 @@ echo   🐰 Compilation de l'APK Native Lapino (Kotlin/Compose)
 echo ========================================================
 echo.
 
-REM 1. Configuration automatique du JDK 17 ou 21 (requis par Android Gradle)
+REM 1. Configuration automatique du JDK 17 ou 21
 if exist "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot\bin\java.exe" (
     set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
 ) else if exist "C:\Program Files\Java\jdk-21\bin\java.exe" (
@@ -23,7 +23,7 @@ if exist "%LOCALAPPDATA%\Android\Sdk" (
 echo [OK] ANDROID_HOME : %ANDROID_HOME%
 echo.
 
-cd /d "%~dp0android"
+cd /d "%~dp0"
 
 REM 3. Boucle de compilation résiliente aux micro-coupures du pare-feu
 set MAX_RETRIES=5
@@ -44,13 +44,11 @@ if !RETRY_COUNT! LEQ %MAX_RETRIES% (
 
 echo.
 echo [ERREUR] La compilation a échoué après %MAX_RETRIES% tentatives.
-cd /d "%~dp0"
 pause
 exit /b 1
 
 :BUILD_SUCCESS
-cd /d "%~dp0"
-set "APK_SOURCE=android\app\build\outputs\apk\release\app-release.apk"
+set "APK_SOURCE=app\build\outputs\apk\release\app-release.apk"
 set "APK_DEST=Lapino.apk"
 
 if exist "%APK_SOURCE%" (
@@ -66,4 +64,3 @@ if exist "%APK_SOURCE%" (
 
 echo.
 pause
-

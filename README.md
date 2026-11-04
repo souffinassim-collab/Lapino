@@ -1,141 +1,41 @@
-# Gestion Lapins - Application Android
+# 🐰 Lapino Élevage - Application Android Native
 
-Application mobile de gestion d'élevage de lapins développée avec React Native et Expo.
+Application mobile de gestion d'élevage cunicole (lapines reproductrices) développée en **100 % Natif Android** avec **Kotlin**, **Jetpack Compose (Material 3)** et **SQLite**.
 
-## 🐰 Fonctionnalités
+---
 
-- **Dashboard**: Vue d'ensemble avec statistiques et alertes de vaccinations
-- **Gestion des Femelles**: Ajout, modification, suivi des lapines
-- **Gestion des Clapets**: Suivi de l'occupation des cages
-- **Gestion des Vaccins**: Base de données des vaccins avec durées
-- **Vaccinations**: Enregistrement automatique avec calcul des prochaines dates
-- **Alertes**: Notifications pour vaccins en retard (rouge) ou à venir (orange)
-- **Thème Clair/Sombre**: Basculement entre modes
+## ⚡ Caractéristiques Techniques
 
-## 📱 Installation
+- **Langage & UI** : Kotlin + Jetpack Compose (Material 3)
+- **Base de données** : SQLite natif embarqué (`SQLiteOpenHelper`) avec migrations automatiques
+- **Taille de l'APK** : **~0,96 Mo** (minifiée et optimisée avec **R8 / ProGuard**)
+- **Compatibilité** : Android 7.0 (API 24) jusqu'à Android 16 (API 36)
+- **100 % Hors-ligne** : Aucune dépendance à un serveur cloud, fonctionnement instantané sur le terrain
 
-### Prérequis
-- Node.js (v14 ou supérieur)
-- npm ou yarn
-- Expo CLI: `npm install -g expo-cli`
+---
 
-### Installation des dépendances
+## 📋 Gestion Cunicole Intégrée
 
-```bash
-npm install
+L'application intègre le cycle biologique de la cuniculiculture moderne :
+
+1. **Mise au mâle (Saillie)** : Enregistrement de la date et du mâle reproducteur.
+2. **Palpation abdominale (J+11 post-saillie)** : Alerte automatique pour effectuer le diagnostic de gestation (ampoules fœtales). Si négatif, remise au mâle immédiate.
+3. **Pose de la boîte à nid (J+28)** : Alerte critique pour installer le nid garni de paille propre avant la mise bas (J+31).
+4. **Mise bas & Carnet rose** : Comptage des lapereaux nés vivants et mort-nés.
+5. **Sevrage (J+30 à J+35)** : Comptage des sevrés et calcul du **taux de survie au nid**.
+6. **Bilan zootechnique par lapine** : Taux de fertilité, moyenne de lapereaux par portée, total sevrés.
+7. **Suivi des vaccins & aliments** : Alertes pour rappels de vaccination (VHD, Myxomatose) et autonomie restante en jours de granulés / foin.
+
+---
+
+## 🛠️ Compilation & Exécution
+
+### 1. Génération de l'APK autonome (`Lapino.apk`)
+Double-cliquez sur :
+```bat
+BUILD_APK.bat
 ```
+L'APK optimisée sera générée à la racine : **`Lapino.apk`**.
 
-## 🚀 Lancement de l'application
-
-### Mode développement
-
-```bash
-npm start
-```
-
-Ensuite, scannez le QR code avec l'application **Expo Go** sur votre téléphone Android.
-
-Ou appuyez sur `a` pour lancer sur un émulateur Android.
-
-## 📦 Build APK
-
-### Méthode 1: EAS Build (Recommandé)
-
-1. Installer EAS CLI:
-```bash
-npm install -g eas-cli
-```
-
-2. Se connecter à Expo:
-```bash
-eas login
-```
-
-3. Configurer le projet:
-```bash
-eas build:configure
-```
-
-4. Build de l'APK:
-```bash
-eas build --platform android --profile production
-```
-
-5. Télécharger l'APK depuis le lien fourni après le build.
-
-### Méthode 2: Build Local
-
-1. Installer Android Studio avec SDK Android
-2. Configurer les variables d'environnement (`ANDROID_HOME`)
-3. Lancer:
-```bash
-npx expo prebuild
-cd android
-./gradlew assembleRelease
-```
-
-L'APK sera dans `android/app/build/outputs/apk/release/`
-
-## 🎨 Structure du Projet
-
-```
-Lapino/
-├── App.js                  # Point d'entrée
-├── app.json               # Configuration Expo
-├── package.json           # Dépendances
-├── eas.json              # Configuration EAS Build
-├── navigation/
-│   └── AppNavigator.js   # Navigation
-├── screens/
-│   ├── DashboardScreen.js
-│   ├── ClapletsScreen.js
-│   ├── VaccinsScreen.js
-│   └── Femelles/
-│       ├── ListScreen.js
-│       ├── DetailScreen.js
-│       └── AddEditScreen.js
-├── components/
-│   ├── StatCard.js
-│   ├── VaccineAlert.js
-│   └── CustomButton.js
-├── database/
-│   ├── schema.sql        # Schéma SQL
-│   └── db.js            # Fonctions DB
-├── theme/
-│   └── theme.js         # Thèmes clair/sombre
-└── utils/
-    ├── dateUtils.js     # Utilitaires dates
-    └── constants.js     # Constantes
-```
-
-## 💾 Base de Données
-
-SQLite avec 4 tables:
-- **clapets**: Cages
-- **femelles**: Lapines
-- **vaccins**: Types de vaccins
-- **vaccinations_femelles**: Historique des vaccinations
-
-## 🔧 Technologies
-
-- React Native
-- Expo SDK 50
-- React Navigation 6
-- Expo SQLite
-- React Native Paper
-
-## 📝 Utilisation
-
-1. **Dashboard**: Consultez les statistiques et les alertes
-2. **Femelles**: Ajoutez vos lapines et assignez-les à des clapets
-3. **Vaccins**: Créez la liste des vaccins avec leurs durées
-4. **Vaccinations**: Enregistrez les vaccinations depuis la fiche femelle
-5. **Alertes**: Suivez les vaccins en retard ou à venir
-
-## 🌓 Thème
-
-Basculez entre mode clair et sombre via le bouton 🌓 dans le header.
-
-## 📄 Licence
-
-Propriétaire - Tous droits réservés
+### 2. Développement sous Android Studio
+Ouvrez directement ce dossier dans Android Studio. Le projet Gradle sera synchronisé automatiquement.

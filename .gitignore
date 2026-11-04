@@ -1,13 +1,51 @@
-node_modules/
-.expo/
-.expo-shared/
-dist/
-npm-debug.*
+# ==========================================
+# Gradle & Android Build Artifacts
+# ==========================================
+.gradle/
+build/
+app/build/
+*/build/
+
+# Binaires et packages compilés
+*.apk
+*.aab
+*.ap_
+*.dex
+Lapino.apk
+
+# Configuration locale & machine (chemins absolus du SDK)
+local.properties
+
+# ==========================================
+# Environnements de développement / IDE
+# ==========================================
+# Android Studio & IntelliJ IDEA
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# VS Code / Cursor
+.vscode/
+
+# ==========================================
+# Système d'exploitation & logs
+# ==========================================
+.DS_Store
+Thumbs.db
+*.log
+
+# ==========================================
+# Clés et certificats de signature
+# ==========================================
 *.jks
-*.p8
+*.keystore
 *.p12
+*.p8
 *.key
-*.mobileprovision
-*.orig.*
-web-build/
+
+# Bases de données locales de test
 *.db
+*.sqlite
