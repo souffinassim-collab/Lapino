@@ -49,3 +49,6 @@ Thumbs.db
 # Bases de données locales de test
 *.db
 *.sqlite
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
