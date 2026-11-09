@@ -526,7 +526,9 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
                                 badge = "J$elapsed",
                                 title = "🩺 ${f.numero} • Palpation à faire !",
                                 subtitle = "Saillie du ${DateHelper.formatFr(c.dateSaillie)}${c.maleNumero?.let { " avec $it" } ?: ""}. Diagnostic de gestation requis.",
-                                actionType = "verify"
+                                actionType = "verify",
+                                elapsed = elapsed,
+                                daysLeft = null
                             )
                         )
                     }
@@ -543,7 +545,9 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
                                 badge = "Urgent J$elapsed",
                                 title = "📦 ${f.numero} • Poser la boîte à nid !",
                                 subtitle = "Mise bas dans ${max(0, daysLeft ?: 3)}j. Garnir le nid de paille propre.",
-                                actionType = "nest"
+                                actionType = "nest",
+                                elapsed = elapsed,
+                                daysLeft = daysLeft
                             )
                         )
                     }
@@ -561,7 +565,9 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
                                 badge = "Naissance",
                                 title = "🐰 ${f.numero} • $msg",
                                 subtitle = "Surveiller le nid et enregistrer la portée dès la naissance.",
-                                actionType = "birth"
+                                actionType = "birth",
+                                elapsed = elapsed,
+                                daysLeft = daysLeft
                             )
                         )
                     }
@@ -577,7 +583,9 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
                                 badge = "J$elapsed",
                                 title = "🧺 ${f.numero} • Sevrage à effectuer",
                                 subtitle = "${c.nombreVivants ?: 0} lapereaux prêts à être séparés de la mère.",
-                                actionType = "wean"
+                                actionType = "wean",
+                                elapsed = elapsed,
+                                daysLeft = null
                             )
                         )
                     }

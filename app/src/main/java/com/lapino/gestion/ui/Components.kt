@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.lapino.gestion.i18n.LocalAppStrings
 import com.lapino.gestion.model.DateHelper
 import com.lapino.gestion.model.Femelle
 import kotlin.math.abs
@@ -32,14 +33,15 @@ fun RabbitStatusCard(
     onAction: (Femelle, String) -> Unit,
     onCardClick: (Femelle) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val cycle = femelle.cycle
 
-    var statusLabel = "En repos"
+    var statusLabel = strings.statusRest
     var statusColor = Color(0xFF757575)
     var statusBg = Color(0xFFEEEEEE)
     var progress = 0f
-    var detailText = "Prête pour une nouvelle saillie"
-    var actionLabel = "Mettre au mâle"
+    var detailText = strings.readyForMating
+    var actionLabel = strings.actionMate
     var actionType = "start"
 
     var alertText: String? = null
@@ -51,21 +53,20 @@ fun RabbitStatusCard(
         when (cycle.statut) {
             "saillie" -> {
                 val elapsed = DateHelper.daysElapsed(cycle.dateSaillie)
-                statusLabel = "Saillie (J$elapsed)"
+                statusLabel = strings.statusMatingElapsed(elapsed)
                 statusColor = PinkSaillie
                 statusBg = PinkContainer
                 progress = (elapsed.toFloat() / 11f).coerceIn(0f, 1f)
-                detailText = "Accouplée le ${DateHelper.formatFr(cycle.dateSaillie)}" +
-                        (cycle.maleNumero?.let { " • Mâle: $it" } ?: "")
-                actionLabel = "Palpation (Diagnostic)"
+                detailText = strings.matingDetail(DateHelper.formatFr(cycle.dateSaillie), cycle.maleNumero)
+                actionLabel = strings.actionPalpate
                 actionType = "verify"
 
                 if (elapsed >= 10) {
-                    alertText = "🔍 Palpation à réaliser ! (J$elapsed - ampoules fœtales palpables)"
+                    alertText = strings.alertPalpationNow(elapsed)
                     alertBg = OrangeContainer
                     alertFg = OrangeAlert
                 } else {
-                    alertText = "Palpation conseillée à J11 (dans ${max(1, 11 - elapsed)}j)"
+                    alertText = strings.alertPalpationAdvised(max(1, 11 - elapsed))
                     alertBg = BlueContainer
                     alertFg = BlueGestante
                 }
@@ -73,25 +74,25 @@ fun RabbitStatusCard(
             "gestante" -> {
                 val elapsed = DateHelper.daysElapsed(cycle.dateSaillie)
                 val daysLeft = DateHelper.daysUntil(cycle.dateMiseBasPrevue)
-                statusLabel = "Gestante (J$elapsed/31)"
+                statusLabel = strings.statusPregnantElapsed(elapsed)
                 statusColor = BlueGestante
                 statusBg = BlueContainer
                 progress = DateHelper.calculateProgress(cycle.dateSaillie, cycle.dateMiseBasPrevue)
                 detailText = when {
-                    daysLeft != null && daysLeft < 0 -> "⚠️ Mise bas dépassée de ${abs(daysLeft)} jour(s) !"
-                    daysLeft == 0 -> "🐰 Mise bas prévue aujourd'hui !"
-                    else -> "Mise bas prévue dans ${daysLeft ?: "?"}j (${DateHelper.formatFr(cycle.dateMiseBasPrevue)})"
+                    daysLeft != null && daysLeft < 0 -> strings.birthOverdueDays(abs(daysLeft))
+                    daysLeft == 0 -> strings.birthDueToday
+                    else -> strings.birthDueInDays(daysLeft, DateHelper.formatFr(cycle.dateMiseBasPrevue))
                 }
-                actionLabel = "Déclarer Naissance"
+                actionLabel = strings.actionDeclareBirth
                 actionType = "birth"
 
                 if (elapsed >= 27 && !cycle.boiteNidPosee) {
-                    alertText = "📦 Urgent (J$elapsed) : Poser la boîte à nid avec paille !"
+                    alertText = strings.alertNestUrgent(elapsed)
                     alertBg = RedContainer
                     alertFg = RedCritical
                     showQuickNestBtn = true
                 } else if (cycle.boiteNidPosee) {
-                    alertText = "✓ Boîte à nid propre installée"
+                    alertText = strings.alertNestInstalled
                     alertBg = GreenContainer
                     alertFg = GreenPrimary
                 }
@@ -99,20 +100,20 @@ fun RabbitStatusCard(
             "allaitante" -> {
                 val elapsed = DateHelper.daysElapsed(cycle.dateMiseBasReelle)
                 val vivants = cycle.nombreVivants ?: 0
-                statusLabel = "Allaitante (J$elapsed/35)"
+                statusLabel = strings.statusNursingElapsed(elapsed)
                 statusColor = GreenPrimary
                 statusBg = GreenContainer
                 progress = DateHelper.calculateProgress(cycle.dateMiseBasReelle, cycle.dateSevragePrevue)
-                detailText = "$vivants lapereau(x) vivant(s) • Nés le ${DateHelper.formatFr(cycle.dateMiseBasReelle)}"
-                actionLabel = if (elapsed >= 30) "Effectuer Sevrage" else "Sevrage"
+                detailText = strings.nursingDetail(vivants, DateHelper.formatFr(cycle.dateMiseBasReelle))
+                actionLabel = if (elapsed >= 30) strings.actionDoWean else strings.actionWean
                 actionType = "wean"
 
                 if (elapsed >= 32) {
-                    alertText = "🧺 Sevrage recommandé (J$elapsed - prêts pour l'engraissement)"
+                    alertText = strings.alertWeaningRecommended(elapsed)
                     alertBg = OrangeContainer
                     alertFg = OrangeAlert
                 } else if (elapsed >= 21) {
-                    alertText = "Sortie du nid : les petits commencent à manger du solide"
+                    alertText = strings.alertKitsEatingSolid
                     alertBg = BlueContainer
                     alertFg = BlueGestante
                 }
@@ -143,7 +144,7 @@ fun RabbitStatusCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "🏠 Loge : ${femelle.clapetNumero?.let { "Clapet $it" } ?: "Non assignée"}",
+                        text = "🏠 " + (femelle.clapetNumero?.let { strings.cageAssigned(it) } ?: strings.cageUnassigned),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -210,7 +211,7 @@ fun RabbitStatusCard(
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
-                            Text("Nid posé ✓", fontSize = 11.sp)
+                            Text(strings.actionNestPlaced, fontSize = 11.sp)
                         }
                     }
                 }
@@ -230,7 +231,7 @@ fun RabbitStatusCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Warning,
-                            contentDescription = "Signaler un incident",
+                            contentDescription = strings.incidentDescription,
                             tint = RedCritical
                         )
                     }
@@ -264,6 +265,7 @@ fun ReproductionDialog(
     onStopCycle: (motif: String, notes: String) -> Unit
 ) {
     if (actionType == null || femelle == null) return
+    val strings = LocalAppStrings.current
 
     var dateInput by remember(femelle, actionType) { mutableStateOf(DateHelper.todayIso()) }
     var maleInput by remember(femelle, actionType) { mutableStateOf(femelle.cycle?.maleNumero ?: "") }
@@ -289,17 +291,14 @@ fun ReproductionDialog(
             ) {
                 when (actionType) {
                     "start" -> {
-                        Text("🌪️ Déclarer une Saillie", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.dialogMatingTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
-                        CuniTipBox(
-                            "💡 Conseil : Amenez toujours la lapine dans la loge du mâle (jamais l'inverse). " +
-                                    "La palpation abdominale sera programmée à J+11."
-                        )
+                        CuniTipBox(strings.matingTip)
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text("Date de saillie (AAAA-MM-JJ)") },
+                            label = { Text(strings.inputMatingDate) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -307,8 +306,8 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = maleInput,
                             onValueChange = { maleInput = it },
-                            label = { Text("Mâle reproducteur (Nom / N°)") },
-                            placeholder = { Text("Ex: M01 - Rex") },
+                            label = { Text(strings.inputMale) },
+                            placeholder = { Text(strings.inputMalePlaceholder) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -316,7 +315,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
-                            label = { Text("Observations (Optionnel)") },
+                            label = { Text(strings.inputObsOptional) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -325,22 +324,19 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = PinkSaillie),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Valider la Saillie", fontWeight = FontWeight.Bold)
+                            Text(strings.btnValidateMating, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     "verify" -> {
-                        Text("🩺 Palpation Abdominale", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.dialogPalpationTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
-                        CuniTipBox(
-                            "💡 Palpez délicatement le bas-ventre entre le pouce et les doigts. " +
-                                    "Entre J10 et J14, les embryons forment un chapelet de billes de la taille d'une noisette."
-                        )
+                        CuniTipBox(strings.palpationTip)
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text("Date du contrôle (AAAA-MM-JJ)") },
+                            label = { Text(strings.inputControlDate) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -348,7 +344,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
-                            label = { Text("Observations (Optionnel)") },
+                            label = { Text(strings.inputObsOptional) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -357,7 +353,7 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("✅ OUI - Gestante confirmée", fontWeight = FontWeight.Bold)
+                            Text(strings.btnPregnantYes, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
@@ -365,40 +361,34 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = RedCritical),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("❌ NON - Vide (Remettre en repos)", fontWeight = FontWeight.Bold)
+                            Text(strings.btnPregnantNo, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     "nest" -> {
-                        Text("📦 Pose de la Boîte à Nid", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.dialogNestTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
-                        CuniTipBox(
-                            "💡 À J28 de gestation (3 jours avant la mise bas), installez une boîte à nid propre " +
-                                    "garnie de copeaux et de paille sèche. La lapine s'arrachera les poils du ventre pour le capitonner."
-                        )
+                        CuniTipBox(strings.nestTip)
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = onConfirmNestBox,
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Confirmer l'installation du nid ✓", fontWeight = FontWeight.Bold)
+                            Text(strings.btnConfirmNest, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     "birth" -> {
-                        Text("🐰 Déclarer la Mise Bas", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.dialogBirthTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
-                        CuniTipBox(
-                            "💡 Contrôlez le nid au calme : retirez les éventuels mort-nés et vérifiez que les ventres " +
-                                    "des petits sont bien rebondis et blancs de lait."
-                        )
+                        CuniTipBox(strings.birthTip)
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text("Date de mise bas (AAAA-MM-JJ)") },
+                            label = { Text(strings.inputDeliveryDate) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -407,7 +397,7 @@ fun ReproductionDialog(
                             OutlinedTextField(
                                 value = vivantsInput,
                                 onValueChange = { vivantsInput = it.filter { ch -> ch.isDigit() } },
-                                label = { Text("Nés vivants") },
+                                label = { Text(strings.inputBornAlive) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
@@ -416,7 +406,7 @@ fun ReproductionDialog(
                             OutlinedTextField(
                                 value = mortsInput,
                                 onValueChange = { mortsInput = it.filter { ch -> ch.isDigit() } },
-                                label = { Text("Mort-nés") },
+                                label = { Text(strings.inputStillborn) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
@@ -426,7 +416,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
-                            label = { Text("Notes sur la portée (Optionnel)") },
+                            label = { Text(strings.inputLitterNotes) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -440,22 +430,19 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Enregistrer la Naissance", fontWeight = FontWeight.Bold)
+                            Text(strings.btnSaveBirth, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     "wean" -> {
-                        Text("🧺 Déclarer le Sevrage", fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.dialogWeaningTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
-                        CuniTipBox(
-                            "💡 Le sevrage (30 à 35 jours) sépare les lapereaux de la mère vers l'engraissement. " +
-                                    "La lapine retourne au statut Repos."
-                        )
+                        CuniTipBox(strings.weaningTip)
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text("Date de sevrage (AAAA-MM-JJ)") },
+                            label = { Text(strings.inputWeaningDate) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -463,7 +450,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = sevresInput,
                             onValueChange = { sevresInput = it.filter { ch -> ch.isDigit() } },
-                            label = { Text("Lapereaux sevrés vivants") },
+                            label = { Text(strings.inputWeanedAlive) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -473,7 +460,7 @@ fun ReproductionDialog(
                         if (nesVivants > 0 && sevresCount != null) {
                             val pct = ((sevresCount.toDouble() / nesVivants) * 100.0).roundToInt()
                             Text(
-                                text = "Taux de survie au nid : $sevresCount / $nesVivants petits ($pct%)",
+                                text = strings.nestSurvivalRate(sevresCount, nesVivants, pct),
                                 fontSize = 12.5.sp,
                                 color = GreenPrimary,
                                 fontWeight = FontWeight.SemiBold,
@@ -484,7 +471,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
-                            label = { Text("Notes / Cage engraissement (Optionnel)") },
+                            label = { Text(strings.inputWeaningNotes) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -497,26 +484,26 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Clôturer le Cycle (Sevrage Réussi)", fontWeight = FontWeight.Bold)
+                            Text(strings.btnCloseCycleSuccess, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     "fail" -> {
                         Text(
-                            "⚠️ Signaler un Incident",
+                            strings.dialogIncidentTitle,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
                             color = RedCritical
                         )
-                        Text("Lapine : ${femelle.numero}", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val motifs = listOf(
-                            "fausse_couche" to "Fausse couche / avortement",
-                            "non_gestante" to "Non gestante (vide)",
-                            "mortalite_portee" to "Mortalité complète de la portée",
-                            "abandon" to "Abandon du nid / manque de lait",
-                            "autre" to "Autre incident"
+                            "fausse_couche" to strings.motifMiscarriage,
+                            "non_gestante" to strings.motifNotPregnant,
+                            "mortalite_portee" to strings.motifLitterMortality,
+                            "abandon" to strings.motifAbandon,
+                            "autre" to strings.motifOther
                         )
                         motifs.forEach { (code, label) ->
                             Row(
@@ -538,7 +525,7 @@ fun ReproductionDialog(
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
-                            label = { Text("Détails de l'incident (Optionnel)") },
+                            label = { Text(strings.inputIncidentDetails) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -547,7 +534,7 @@ fun ReproductionDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = RedCritical),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Confirmer et Remettre en Repos", fontWeight = FontWeight.Bold)
+                            Text(strings.btnConfirmStopCycle, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -556,7 +543,7 @@ fun ReproductionDialog(
                     onClick = onDismiss,
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Fermer")
+                    Text(strings.close)
                 }
             }
         }

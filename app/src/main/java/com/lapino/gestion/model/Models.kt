@@ -1,10 +1,13 @@
 package com.lapino.gestion.model
 
+import com.lapino.gestion.i18n.AppStrings
+import com.lapino.gestion.i18n.AppStringsFR
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
@@ -95,11 +98,41 @@ data class ReproAlert(
     val type: ReproAlertType,
     val femelle: Femelle,
     val cycle: CycleReproduction,
-    val badge: String,
-    val title: String,
-    val subtitle: String,
-    val actionType: String // "verify", "nest", "birth", "wean"
-)
+    val badge: String = "",
+    val title: String = "",
+    val subtitle: String = "",
+    val actionType: String, // "verify", "nest", "birth", "wean"
+    val elapsed: Int = 0,
+    val daysLeft: Int? = null
+) {
+    fun getBadge(strings: AppStrings): String = when (type) {
+        ReproAlertType.PALPATION -> strings.alertBadgeDay(elapsed)
+        ReproAlertType.BOITE_NID -> strings.alertBadgeUrgent(elapsed)
+        ReproAlertType.MISE_BAS -> strings.alertBadgeBirth
+        ReproAlertType.SEVRAGE -> strings.alertBadgeDay(elapsed)
+    }
+
+    fun getTitle(strings: AppStrings): String = when (type) {
+        ReproAlertType.PALPATION -> strings.alertTitlePalpation(femelle.numero)
+        ReproAlertType.BOITE_NID -> strings.alertTitleNest(femelle.numero)
+        ReproAlertType.MISE_BAS -> {
+            val dl = daysLeft ?: 0
+            when {
+                dl < 0 -> strings.alertTitleBirthOverdue(femelle.numero, abs(dl))
+                dl == 0 -> strings.alertTitleBirthToday(femelle.numero)
+                else -> strings.alertTitleBirthInDays(femelle.numero, dl)
+            }
+        }
+        ReproAlertType.SEVRAGE -> strings.alertTitleWeaning(femelle.numero)
+    }
+
+    fun getSubtitle(strings: AppStrings): String = when (type) {
+        ReproAlertType.PALPATION -> strings.alertSubPalpation(DateHelper.formatFr(cycle.dateSaillie), cycle.maleNumero)
+        ReproAlertType.BOITE_NID -> strings.alertSubNest(max(0, daysLeft ?: 3))
+        ReproAlertType.MISE_BAS -> strings.alertSubBirth
+        ReproAlertType.SEVRAGE -> strings.alertSubWeaning(cycle.nombreVivants ?: 0)
+    }
+}
 
 data class GlobalStats(
     val totalFemelles: Int = 0,
@@ -189,17 +222,17 @@ object DateHelper {
         return max(0f, min(1f, ratio))
     }
 
-    fun calculateAgeLabel(birthIso: String?): String {
-        val birth = parseIso(birthIso) ?: return "Inconnu"
+    fun calculateAgeLabel(birthIso: String?, strings: AppStrings = AppStringsFR): String {
+        val birth = parseIso(birthIso) ?: return strings.unknown
         val calBirth = Calendar.getInstance().apply { time = birth }
         val calNow = Calendar.getInstance()
         val months = (calNow.get(Calendar.YEAR) - calBirth.get(Calendar.YEAR)) * 12 +
                 (calNow.get(Calendar.MONTH) - calBirth.get(Calendar.MONTH))
-        if (months < 1) return "Moins d'un mois"
-        if (months < 12) return "$months mois"
+        if (months < 1) return strings.ageUnderMonth
+        if (months < 12) return strings.ageMonths(months)
         val years = months / 12
         val remMonths = months % 12
-        return if (remMonths > 0) "$years an(s) et $remMonths mois" else "$years an(s)"
+        return if (remMonths > 0) strings.ageYearsAndMonths(years, remMonths) else strings.ageYears(years)
     }
 }
 

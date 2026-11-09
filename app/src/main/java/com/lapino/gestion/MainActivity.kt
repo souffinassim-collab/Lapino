@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.lapino.gestion.data.LapinoDatabase
+import com.lapino.gestion.i18n.*
 import com.lapino.gestion.model.*
 import com.lapino.gestion.ui.*
 import java.util.Locale
@@ -42,13 +45,28 @@ class MainActivity : ComponentActivity() {
         db = LapinoDatabase(applicationContext)
 
         setContent {
+            val context = LocalContext.current
+            var currentLang by remember { mutableStateOf(LanguageManager.getSavedLanguage(context)) }
+            val strings = if (currentLang == AppLanguage.AR) AppStringsAR else AppStringsFR
             var isDark by remember { mutableStateOf(false) }
-            LapinoTheme(darkTheme = isDark) {
-                LapinoApp(
-                    db = db,
-                    isDark = isDark,
-                    onToggleDark = { isDark = !isDark }
-                )
+
+            CompositionLocalProvider(
+                LocalAppLanguage provides currentLang,
+                LocalAppStrings provides strings,
+                LocalLayoutDirection provides currentLang.layoutDirection
+            ) {
+                LapinoTheme(darkTheme = isDark) {
+                    LapinoApp(
+                        db = db,
+                        isDark = isDark,
+                        currentLang = currentLang,
+                        onToggleDark = { isDark = !isDark },
+                        onLanguageChanged = { newLang ->
+                            currentLang = newLang
+                            LanguageManager.saveLanguage(context, newLang)
+                        }
+                    )
+                }
             }
         }
     }
@@ -59,8 +77,11 @@ class MainActivity : ComponentActivity() {
 fun LapinoApp(
     db: LapinoDatabase,
     isDark: Boolean,
-    onToggleDark: () -> Unit
+    currentLang: AppLanguage,
+    onToggleDark: () -> Unit,
+    onLanguageChanged: (AppLanguage) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var currentTab by remember { mutableIntStateOf(0) }
     var selectedFemelleDetailId by remember { mutableStateOf<Long?>(null) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
@@ -93,7 +114,7 @@ fun LapinoApp(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (selectedFemelleDetailId != null) "Fiche Lapine" else "🐰 Lapino Élevage",
+                        text = if (selectedFemelleDetailId != null) strings.femaleDetailTitle else strings.appTitle,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -102,18 +123,41 @@ fun LapinoApp(
                     if (selectedFemelleDetailId != null) {
                         IconButton(onClick = { selectedFemelleDetailId = null }) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Retour",
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = strings.back,
                                 tint = Color.White
                             )
                         }
                     }
                 },
                 actions = {
+                    // Bouton de bascule linguistique Français / العربية
+                    Surface(
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                val next = if (currentLang == AppLanguage.FR) AppLanguage.AR else AppLanguage.FR
+                                onLanguageChanged(next)
+                            },
+                        color = Color.White.copy(alpha = 0.22f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (currentLang == AppLanguage.FR) "🇸🇦 عربي" else "🇫🇷 FR",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                     IconButton(onClick = onToggleDark) {
                         Icon(
                             imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Thème clair/sombre",
+                            contentDescription = strings.themeToggleDesc,
                             tint = Color.White
                         )
                     }
@@ -129,26 +173,26 @@ fun LapinoApp(
                     NavigationBarItem(
                         selected = currentTab == 0,
                         onClick = { currentTab = 0 },
-                        icon = { Icon(Icons.Default.Dashboard, contentDescription = "Accueil") },
-                        label = { Text("Accueil") }
+                        icon = { Icon(Icons.Default.Dashboard, contentDescription = strings.navHome) },
+                        label = { Text(strings.navHome) }
                     )
                     NavigationBarItem(
                         selected = currentTab == 1,
                         onClick = { currentTab = 1 },
-                        icon = { Icon(Icons.Default.Pets, contentDescription = "Lapines") },
-                        label = { Text("Lapines (${femelles.size})") }
+                        icon = { Icon(Icons.Default.Pets, contentDescription = strings.navRabbits(femelles.size)) },
+                        label = { Text(strings.navRabbits(femelles.size)) }
                     )
                     NavigationBarItem(
                         selected = currentTab == 2,
                         onClick = { currentTab = 2 },
-                        icon = { Icon(Icons.Default.HomeWork, contentDescription = "Élevage") },
-                        label = { Text("Clapets & Stocks") }
+                        icon = { Icon(Icons.Default.HomeWork, contentDescription = strings.navElevage) },
+                        label = { Text(strings.navElevage) }
                     )
                     NavigationBarItem(
                         selected = currentTab == 3,
                         onClick = { currentTab = 3 },
-                        icon = { Icon(Icons.Default.MedicalServices, contentDescription = "Vaccins") },
-                        label = { Text("Vaccins") }
+                        icon = { Icon(Icons.Default.MedicalServices, contentDescription = strings.navVaccines) },
+                        label = { Text(strings.navVaccines) }
                     )
                 }
             }
@@ -163,7 +207,7 @@ fun LapinoApp(
                     containerColor = GreenPrimary,
                     contentColor = Color.White,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text("Lapine", fontWeight = FontWeight.Bold) }
+                    text = { Text(strings.fabNewRabbit, fontWeight = FontWeight.Bold) }
                 )
             }
         }
@@ -345,6 +389,8 @@ fun DashboardTab(
     onOpenFemelle: (Femelle) -> Unit,
     onGoToStocks: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 88.dp)
@@ -353,17 +399,17 @@ fun DashboardTab(
         item {
             Row(modifier = Modifier.fillMaxWidth()) {
                 SummaryStatCard(
-                    title = "Lapines actives",
+                    title = strings.statActiveRabbits,
                     value = stats.totalFemelles.toString(),
-                    subtitle = "${stats.clapetsRemplis}/${stats.clapetsTotal} loges occupées",
+                    subtitle = strings.statOccupiedCages(stats.clapetsRemplis, stats.clapetsTotal),
                     color = GreenPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 SummaryStatCard(
-                    title = "Lapereaux au nid",
+                    title = strings.statKitsInNest,
                     value = stats.lapereauxSousMere.toString(),
-                    subtitle = "${stats.allaitantes} mère(s) allaitante(s)",
+                    subtitle = strings.statNursingMothers(stats.allaitantes),
                     color = BlueGestante,
                     modifier = Modifier.weight(1f)
                 )
@@ -377,10 +423,10 @@ fun DashboardTab(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatusPill("💤 Repos: ${stats.enRepos}", Color(0xFFEEEEEE), Color(0xFF424242))
-                StatusPill("❤️ Saillie: ${stats.enSaillie}", PinkContainer, PinkSaillie)
-                StatusPill("🤰 Gestante: ${stats.gestantes}", BlueContainer, BlueGestante)
-                StatusPill("🍼 Allaitante: ${stats.allaitantes}", GreenContainer, GreenPrimary)
+                StatusPill(strings.pillRest(stats.enRepos), Color(0xFFEEEEEE), Color(0xFF424242))
+                StatusPill(strings.pillMating(stats.enSaillie), PinkContainer, PinkSaillie)
+                StatusPill(strings.pillPregnant(stats.gestantes), BlueContainer, BlueGestante)
+                StatusPill(strings.pillNursing(stats.allaitantes), GreenContainer, GreenPrimary)
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -389,7 +435,7 @@ fun DashboardTab(
         if (reproAlerts.isNotEmpty()) {
             item {
                 Text(
-                    text = "🚨 Actions Élevage Prioritaires (${reproAlerts.size})",
+                    text = strings.sectionPriorityActions(reproAlerts.size),
                     fontSize = 16.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = OrangeAlert,
@@ -424,7 +470,7 @@ fun DashboardTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = alert.title,
+                                text = alert.getTitle(strings),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = fg,
@@ -435,7 +481,7 @@ fun DashboardTab(
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text(
-                                    text = alert.badge,
+                                    text = alert.getBadge(strings),
                                     color = fg,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -444,7 +490,7 @@ fun DashboardTab(
                             }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = alert.subtitle, fontSize = 12.5.sp, color = Color(0xFF333333))
+                        Text(text = alert.getSubtitle(strings), fontSize = 12.5.sp, color = Color(0xFF333333))
                     }
                 }
             }
@@ -455,7 +501,7 @@ fun DashboardTab(
         if (alimentsBas.isNotEmpty()) {
             item {
                 Text(
-                    text = "⚠️ Stock Alimentation Bas (${alimentsBas.size})",
+                    text = strings.sectionLowFeedStock(alimentsBas.size),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = RedCritical,
@@ -480,13 +526,13 @@ fun DashboardTab(
                         Column {
                             Text(alim.nom, fontWeight = FontWeight.Bold, color = Color(0xFF1E1E1E))
                             Text(
-                                "${alim.stockKg} kg en stock (${String.format(Locale.US, "%.2f", alim.consoJourKg)} kg/j)",
+                                strings.feedStockInfo(alim.stockKg, alim.consoJourKg),
                                 fontSize = 12.sp,
                                 color = Color(0xFF424242)
                             )
                         }
                         Text(
-                            "Reste ${alim.joursRestants} j",
+                            strings.feedDaysRemaining(alim.joursRestants),
                             fontWeight = FontWeight.Bold,
                             color = RedCritical
                         )
@@ -500,7 +546,7 @@ fun DashboardTab(
         if (vaccineAlerts.isNotEmpty()) {
             item {
                 Text(
-                    text = "💉 Rappels Vaccins (${vaccineAlerts.size})",
+                    text = strings.sectionVaccineReminders(vaccineAlerts.size),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = OrangeAlert,
@@ -534,13 +580,13 @@ fun DashboardTab(
                                 color = Color(0xFF1E1E1E)
                             )
                             Text(
-                                "Échéance : ${DateHelper.formatFr(vac.dateProchain)}",
+                                strings.vaccineDueDate(DateHelper.formatFr(vac.dateProchain)),
                                 fontSize = 12.sp,
                                 color = Color(0xFF424242)
                             )
                         }
                         Text(
-                            text = if (days < 0) "En retard" else "Dans ${days}j",
+                            text = if (days < 0) strings.overdue else strings.inDays(days),
                             fontWeight = FontWeight.Bold,
                             color = if (days < 0) RedCritical else OrangeAlert
                         )
@@ -553,7 +599,7 @@ fun DashboardTab(
         // 5. Liste directe des lapines
         item {
             Text(
-                text = "Mes Lapines Reproductrices (${femelles.size})",
+                text = strings.sectionMyRabbits(femelles.size),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -578,6 +624,7 @@ fun FemellesListTab(
     onActionCycle: (Femelle, String) -> Unit,
     onOpenFemelle: (Femelle) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
 
@@ -601,7 +648,7 @@ fun FemellesListTab(
         OutlinedTextField(
             value = search,
             onValueChange = { search = it },
-            placeholder = { Text("Rechercher par nom ou clapet...") },
+            placeholder = { Text(strings.searchPlaceholder) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier
@@ -617,11 +664,11 @@ fun FemellesListTab(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val filters = listOf(
-                "all" to "Toutes (${femelles.size})",
-                "repos" to "Repos",
-                "saillie" to "Saillie",
-                "gestante" to "Gestante",
-                "allaitante" to "Allaitante"
+                "all" to strings.filterAll(femelles.size),
+                "repos" to strings.filterRest,
+                "saillie" to strings.filterMating,
+                "gestante" to strings.filterPregnant,
+                "allaitante" to strings.filterNursing
             )
             filters.forEach { (key, label) ->
                 FilterChip(
@@ -658,6 +705,7 @@ fun FemelleDetailView(
     onActionCycle: (Femelle, String) -> Unit,
     onVaccinationAdded: () -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val stats = remember(femelle.id, refreshKey) { db.getFemelleStats(femelle.id) }
     val history = remember(femelle.id, refreshKey) { db.getFemelleHistory(femelle.id) }
     val vaccinations = remember(femelle.id, refreshKey) { db.getVaccinationsByFemelle(femelle.id) }
@@ -689,21 +737,27 @@ fun FemelleDetailView(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Loge : ${femelle.clapetNumero?.let { "Clapet $it" } ?: "Non assignée"}",
+                                text = "🏠 " + (femelle.clapetNumero?.let { strings.cageAssigned(it) } ?: strings.cageUnassigned),
                                 fontSize = 14.sp,
                                 color = Color.Gray
                             )
                         }
                         OutlinedButton(onClick = onEditFemelle) {
-                            Text("Modifier")
+                            Text(strings.edit)
                         }
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
-                    InfoRow("Âge estimé :", DateHelper.calculateAgeLabel(femelle.dateNaissance))
-                    InfoRow("Date de naissance :", DateHelper.formatFr(femelle.dateNaissance))
-                    InfoRow("Statut général :", femelle.statut.uppercase(Locale.ROOT))
+                    InfoRow(strings.estimatedAge, DateHelper.calculateAgeLabel(femelle.dateNaissance, strings))
+                    InfoRow(strings.birthDate, DateHelper.formatFr(femelle.dateNaissance))
+                    val statutLabel = when (femelle.statut.lowercase()) {
+                        "vivante" -> strings.statusLiving
+                        "vendue" -> strings.statusSold
+                        "morte" -> strings.statusDead
+                        else -> femelle.statut.uppercase(Locale.ROOT)
+                    }
+                    InfoRow(strings.generalStatus, statutLabel)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -712,7 +766,7 @@ fun FemelleDetailView(
         // 2. Cycle actuel
         item {
             Text(
-                "🌪️ Cycle Reproductif Actuel",
+                strings.currentCycleHeader,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.5.sp,
                 modifier = Modifier.padding(bottom = 6.dp)
@@ -734,7 +788,7 @@ fun FemelleDetailView(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "📊 Bilan Zootechnique de la Lapine",
+                        strings.zootechnicalSummaryHeader,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.5.sp
                     )
@@ -743,10 +797,10 @@ fun FemelleDetailView(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        MiniKpiBox("${stats.tauxFertilite}%", "Fertilité", GreenPrimary, Modifier.weight(1f))
-                        MiniKpiBox("${stats.totalMisesBas}", "Portées", BlueGestante, Modifier.weight(1f))
-                        MiniKpiBox(stats.moyennePortee, "Vivants/portée", GreenPrimary, Modifier.weight(1f))
-                        MiniKpiBox("${stats.totalSevres}", "Sevrés", GreenPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.tauxFertilite}%", strings.kpiFertility, GreenPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.totalMisesBas}", strings.kpiLitters, BlueGestante, Modifier.weight(1f))
+                        MiniKpiBox(stats.moyennePortee, strings.kpiAlivePerLitter, GreenPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.totalSevres}", strings.kpiWeaned, GreenPrimary, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -754,12 +808,12 @@ fun FemelleDetailView(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "Nés : ${stats.totalVivants} vivants • ${stats.totalMorts} mort-nés",
+                            strings.bornSummary(stats.totalVivants, stats.totalMorts),
                             fontSize = 12.5.sp,
                             color = Color.Gray
                         )
                         Text(
-                            "Survie sevrage : ${stats.tauxSevrage}",
+                            strings.weaningSurvivalRate(stats.tauxSevrage),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = GreenPrimary
@@ -779,13 +833,13 @@ fun FemelleDetailView(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "📜 Historique des Cycles & Portées (${history.size})",
+                        strings.historyHeader(history.size),
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.5.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     if (history.isEmpty()) {
-                        Text("Aucun cycle enregistré.", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.noCyclesRecorded, fontSize = 13.sp, color = Color.Gray)
                     } else {
                         history.forEach { c ->
                             Surface(
@@ -801,15 +855,17 @@ fun FemelleDetailView(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            "Saillie : ${DateHelper.formatFr(c.dateSaillie)}" +
-                                                    (c.maleNumero?.let { " • Mâle: $it" } ?: ""),
+                                            strings.cycleMatingLine(DateHelper.formatFr(c.dateSaillie), c.maleNumero),
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
                                         )
                                         Text(
                                             text = when (c.statut) {
-                                                "termine" -> "Sevré ✓"
-                                                "echec" -> "Échec"
+                                                "termine" -> strings.statusWeanedSuccess
+                                                "echec" -> strings.statusFailed
+                                                "saillie" -> strings.filterMating
+                                                "gestante" -> strings.filterPregnant
+                                                "allaitante" -> strings.filterNursing
                                                 else -> c.statut.uppercase(Locale.ROOT)
                                             },
                                             fontWeight = FontWeight.Bold,
@@ -823,8 +879,7 @@ fun FemelleDetailView(
                                     }
                                     if (!c.dateMiseBasReelle.isNullOrBlank()) {
                                         Text(
-                                            "🐰 Mise bas : ${DateHelper.formatFr(c.dateMiseBasReelle)} • " +
-                                                    "${c.nombreVivants ?: 0} vivants, ${c.nombreMorts ?: 0} mort-nés",
+                                            strings.cycleBirthLine(DateHelper.formatFr(c.dateMiseBasReelle), c.nombreVivants ?: 0, c.nombreMorts ?: 0),
                                             fontSize = 12.5.sp
                                         )
                                     }
@@ -833,7 +888,7 @@ fun FemelleDetailView(
                                             " (${((c.nombreSevres.toDouble() / c.nombreVivants!!) * 100).roundToInt()}%)"
                                         } else ""
                                         Text(
-                                            "🧺 Sevrés : ${c.nombreSevres} lapereaux$survie",
+                                            strings.cycleWeanedLine(c.nombreSevres, survie),
                                             fontSize = 12.5.sp,
                                             color = GreenPrimary,
                                             fontWeight = FontWeight.SemiBold
@@ -841,14 +896,14 @@ fun FemelleDetailView(
                                     }
                                     if (!c.motifEchec.isNullOrBlank()) {
                                         Text(
-                                            "Motif : ${c.motifEchec}",
+                                            strings.cycleReason(c.motifEchec),
                                             fontSize = 12.sp,
                                             color = RedCritical
                                         )
                                     }
                                     if (!c.notes.isNullOrBlank()) {
                                         Text(
-                                            "Obs : ${c.notes}",
+                                            strings.cycleNotes(c.notes),
                                             fontSize = 12.sp,
                                             fontStyle = FontStyle.Italic,
                                             color = Color.Gray
@@ -877,7 +932,7 @@ fun FemelleDetailView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "💉 Vaccinations (${vaccinations.size})",
+                            strings.vaccinationsSectionHeader(vaccinations.size),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.5.sp
                         )
@@ -885,12 +940,12 @@ fun FemelleDetailView(
                             onClick = { showVaccinDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                         ) {
-                            Text("+ Vacciner")
+                            Text(strings.vaccinateBtn)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     if (vaccinations.isEmpty()) {
-                        Text("Aucune vaccination enregistrée.", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.noVaccinationsRecorded, fontSize = 13.sp, color = Color.Gray)
                     } else {
                         vaccinations.forEach { v ->
                             Row(
@@ -901,7 +956,7 @@ fun FemelleDetailView(
                             ) {
                                 Text(v.vaccinNom, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
                                 Text(
-                                    "Fait: ${DateHelper.formatFr(v.dateVaccination)} → Rappel: ${DateHelper.formatFr(v.dateProchain)}",
+                                    strings.vaccinationLine(DateHelper.formatFr(v.dateVaccination), DateHelper.formatFr(v.dateProchain)),
                                     fontSize = 12.sp,
                                     color = Color.Gray
                                 )
@@ -919,7 +974,7 @@ fun FemelleDetailView(
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Supprimer cette lapine")
+                Text(strings.deleteRabbitBtn)
             }
         }
     }
@@ -931,7 +986,7 @@ fun FemelleDetailView(
         Dialog(onDismissRequest = { showVaccinDialog = false }) {
             Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("💉 Enregistrer une Vaccination", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(strings.dialogRecordVaccinationTitle, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(modifier = Modifier.height(10.dp))
                     vaccins.forEach { v ->
                         Row(
@@ -951,13 +1006,13 @@ fun FemelleDetailView(
                     OutlinedTextField(
                         value = dateVac,
                         onValueChange = { dateVac = it },
-                        label = { Text("Date de vaccination (AAAA-MM-JJ)") },
+                        label = { Text(strings.inputVaccinationDate) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showVaccinDialog = false }) { Text("Annuler") }
+                        TextButton(onClick = { showVaccinDialog = false }) { Text(strings.cancel) }
                         Button(
                             onClick = {
                                 db.addVaccination(femelle.id, selectedVaccinId, dateVac)
@@ -966,7 +1021,7 @@ fun FemelleDetailView(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                         ) {
-                            Text("Enregistrer")
+                            Text(strings.save)
                         }
                     }
                 }
@@ -977,8 +1032,8 @@ fun FemelleDetailView(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Supprimer ${femelle.numero} ?") },
-            text = { Text("Cette action supprimera la lapine et tout son historique de reproduction.") },
+            title = { Text(strings.deleteRabbitTitle(femelle.numero)) },
+            text = { Text(strings.deleteRabbitMessage) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -987,11 +1042,11 @@ fun FemelleDetailView(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RedCritical)
                 ) {
-                    Text("Supprimer")
+                    Text(strings.confirmDelete)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Annuler") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(strings.cancel) }
             }
         )
     }
@@ -1006,6 +1061,7 @@ fun ElevageStocksTab(
     onSaveAliment: (Long?, String, Double, Double) -> Unit,
     onDeleteAliment: (Long) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var newClapetNum by remember { mutableStateOf("") }
     var showAlimDialog by remember { mutableStateOf(false) }
     var editingAliment by remember { mutableStateOf<Aliment?>(null) }
@@ -1021,7 +1077,7 @@ fun ElevageStocksTab(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🌾 Stocks d'Alimentation", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(strings.feedStockHeader, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Button(
                     onClick = {
                         editingAliment = null
@@ -1029,7 +1085,7 @@ fun ElevageStocksTab(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                 ) {
-                    Text("+ Aliment")
+                    Text(strings.btnAddFeed)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1056,19 +1112,19 @@ fun ElevageStocksTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(alim.nom, fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
                         Text(
-                            "Stock : ${alim.stockKg} kg • Ration : ${alim.consommationG.toInt()} g/j/lapine",
+                            strings.feedStockRow(alim.stockKg, alim.consommationG.toInt()),
                             fontSize = 13.sp,
                             color = Color.Gray
                         )
                         Text(
-                            "Autonomie estimée : ${alim.joursRestants} jour(s)",
+                            strings.feedAutonomyRow(alim.joursRestants),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (alim.joursRestants <= 7) RedCritical else GreenPrimary
                         )
                     }
                     IconButton(onClick = { onDeleteAliment(alim.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
                     }
                 }
             }
@@ -1077,7 +1133,7 @@ fun ElevageStocksTab(
         // Section Clapets
         item {
             Spacer(modifier = Modifier.height(20.dp))
-            Text("🏠 Gestion des Clapets (${clapets.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(strings.cagesManagementHeader(clapets.size), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1086,7 +1142,7 @@ fun ElevageStocksTab(
                 OutlinedTextField(
                     value = newClapetNum,
                     onValueChange = { newClapetNum = it },
-                    label = { Text("Nouveau clapet (ex: C1)") },
+                    label = { Text(strings.inputNewCage) },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
@@ -1100,7 +1156,7 @@ fun ElevageStocksTab(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                 ) {
-                    Text("Ajouter")
+                    Text(strings.btnAdd)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1121,15 +1177,15 @@ fun ElevageStocksTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Loge / Clapet ${c.numero}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(strings.cageTitle(c.numero), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(
-                            text = c.occupanteNumero?.let { "Occupé par : $it" } ?: "Libre / Vide",
+                            text = c.occupanteNumero?.let { strings.cageOccupiedBy(it) } ?: strings.cageEmpty,
                             fontSize = 13.sp,
                             color = if (c.occupanteNumero != null) GreenPrimary else Color.Gray
                         )
                     }
                     IconButton(onClick = { onDeleteClapet(c.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
                     }
                 }
             }
@@ -1145,7 +1201,7 @@ fun ElevageStocksTab(
             Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        if (editingAliment == null) "Ajouter un Aliment" else "Modifier l'Aliment",
+                        if (editingAliment == null) strings.dialogAddFeedTitle else strings.dialogEditFeedTitle,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
@@ -1153,7 +1209,7 @@ fun ElevageStocksTab(
                     OutlinedTextField(
                         value = nom,
                         onValueChange = { nom = it },
-                        label = { Text("Nom de l'aliment") },
+                        label = { Text(strings.inputFeedName) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1161,7 +1217,7 @@ fun ElevageStocksTab(
                     OutlinedTextField(
                         value = stock,
                         onValueChange = { stock = it },
-                        label = { Text("Stock disponible (en kg)") },
+                        label = { Text(strings.inputFeedStock) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -1170,14 +1226,14 @@ fun ElevageStocksTab(
                     OutlinedTextField(
                         value = conso,
                         onValueChange = { conso = it },
-                        label = { Text("Ration quotidienne par lapine (en g)") },
+                        label = { Text(strings.inputFeedDailyRation) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showAlimDialog = false }) { Text("Annuler") }
+                        TextButton(onClick = { showAlimDialog = false }) { Text(strings.cancel) }
                         Button(
                             onClick = {
                                 if (nom.isNotBlank()) {
@@ -1192,7 +1248,7 @@ fun ElevageStocksTab(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                         ) {
-                            Text("Enregistrer")
+                            Text(strings.save)
                         }
                     }
                 }
@@ -1209,6 +1265,7 @@ fun VaccinsTab(
     onDeleteVaccin: (Long) -> Unit,
     onOpenFemelle: (Long) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var nom by remember { mutableStateOf("") }
     var duree by remember { mutableStateOf("365") }
 
@@ -1217,7 +1274,7 @@ fun VaccinsTab(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 48.dp)
     ) {
         item {
-            Text("💉 Référentiel des Vaccins", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(strings.vaccinesRefHeader, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1226,7 +1283,7 @@ fun VaccinsTab(
                 OutlinedTextField(
                     value = nom,
                     onValueChange = { nom = it },
-                    label = { Text("Nom du vaccin (ex: VHD)") },
+                    label = { Text(strings.inputVaccineName) },
                     singleLine = true,
                     modifier = Modifier.weight(1.4f)
                 )
@@ -1234,7 +1291,7 @@ fun VaccinsTab(
                 OutlinedTextField(
                     value = duree,
                     onValueChange = { duree = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Validité (j)") },
+                    label = { Text(strings.inputValidityDays) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.weight(0.8f)
@@ -1271,10 +1328,10 @@ fun VaccinsTab(
                 ) {
                     Column {
                         Text(v.nom, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Rappel tous les ${v.dureeJours} jours", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.vaccineReminderInterval(v.dureeJours), fontSize = 13.sp, color = Color.Gray)
                     }
                     IconButton(onClick = { onDeleteVaccin(v.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
                     }
                 }
             }
@@ -1289,6 +1346,7 @@ fun AddEditFemelleDialog(
     onDismiss: () -> Unit,
     onSave: (numero: String, clapetId: Long?, dateNaissance: String?, statut: String) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     var numero by remember(existing) { mutableStateOf(existing?.numero ?: "") }
     var clapetId by remember(existing) { mutableStateOf(existing?.clapetId) }
     var dateNaissance by remember(existing) { mutableStateOf(existing?.dateNaissance ?: DateHelper.todayIso()) }
@@ -1298,7 +1356,7 @@ fun AddEditFemelleDialog(
         Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    if (existing == null) "🐰 Nouvelle Lapine" else "Modifier ${existing.numero}",
+                    if (existing == null) strings.dialogNewRabbitTitle else strings.dialogEditRabbitTitle(existing.numero),
                     fontWeight = FontWeight.Bold,
                     fontSize = 19.sp
                 )
@@ -1306,8 +1364,8 @@ fun AddEditFemelleDialog(
                 OutlinedTextField(
                     value = numero,
                     onValueChange = { numero = it },
-                    label = { Text("Nom / Numéro d'identification") },
-                    placeholder = { Text("Ex: F05 - Argentée") },
+                    label = { Text(strings.inputRabbitName) },
+                    placeholder = { Text(strings.inputRabbitNamePlaceholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1315,12 +1373,12 @@ fun AddEditFemelleDialog(
                 OutlinedTextField(
                     value = dateNaissance,
                     onValueChange = { dateNaissance = it },
-                    label = { Text("Date de naissance (AAAA-MM-JJ)") },
+                    label = { Text(strings.inputBirthDate) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(10.dp))
-                Text("Clapet / Loge :", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+                Text(strings.inputCageSelect, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1331,7 +1389,7 @@ fun AddEditFemelleDialog(
                     FilterChip(
                         selected = clapetId == null,
                         onClick = { clapetId = null },
-                        label = { Text("Aucun") }
+                        label = { Text(strings.noneOption) }
                     )
                     clapets.forEach { c ->
                         FilterChip(
@@ -1343,7 +1401,7 @@ fun AddEditFemelleDialog(
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Annuler") }
+                    TextButton(onClick = onDismiss) { Text(strings.cancel) }
                     Button(
                         onClick = {
                             if (numero.isNotBlank()) {
@@ -1353,7 +1411,7 @@ fun AddEditFemelleDialog(
                         enabled = numero.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                     ) {
-                        Text("Enregistrer")
+                        Text(strings.save)
                     }
                 }
             }

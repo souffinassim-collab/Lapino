@@ -7,8 +7,9 @@ Application mobile de gestion d'élevage cunicole (lapines reproductrices) déve
 ## ⚡ Caractéristiques Techniques
 
 - **Langage & UI** : Kotlin + Jetpack Compose (Material 3)
+- **Multilingue instantané** : Français 🇫🇷 et Arabe 🇸🇦 avec support RTL (Right-to-Left) natif
 - **Base de données** : SQLite natif embarqué (`SQLiteOpenHelper`) avec migrations automatiques
-- **Taille de l'APK** : **~0,96 Mo** (minifiée et optimisée avec **R8 / ProGuard**)
+- **Taille de l'APK** : **~0,97 Mo** (minifiée et optimisée avec **R8 / ProGuard**)
 - **Compatibilité** : Android 7.0 (API 24) jusqu'à Android 16 (API 36)
 - **100 % Hors-ligne** : Aucune dépendance à un serveur cloud, fonctionnement instantané sur le terrain
 
