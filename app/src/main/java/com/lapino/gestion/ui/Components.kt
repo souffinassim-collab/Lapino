@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.lapino.gestion.i18n.LocalAppStrings
+import com.lapino.gestion.i18n.menu
+import com.lapino.gestion.model.CycleRules
 import com.lapino.gestion.model.DateHelper
 import com.lapino.gestion.model.Femelle
 import kotlin.math.abs
@@ -56,7 +58,7 @@ fun RabbitStatusCard(
                 statusLabel = strings.statusMatingElapsed(elapsed)
                 statusColor = PinkSaillie
                 statusBg = PinkContainer
-                progress = (elapsed.toFloat() / 11f).coerceIn(0f, 1f)
+                progress = (elapsed.toFloat() / CycleRules.PALPATION_DAYS).coerceIn(0f, 1f)
                 detailText = strings.matingDetail(DateHelper.formatFr(cycle.dateSaillie), cycle.maleNumero)
                 actionLabel = strings.actionPalpate
                 actionType = "verify"
@@ -66,7 +68,7 @@ fun RabbitStatusCard(
                     alertBg = OrangeContainer
                     alertFg = OrangeAlert
                 } else {
-                    alertText = strings.alertPalpationAdvised(max(1, 11 - elapsed))
+                    alertText = strings.alertPalpationAdvised(max(1, CycleRules.PALPATION_DAYS - elapsed))
                     alertBg = BlueContainer
                     alertFg = BlueGestante
                 }
@@ -93,19 +95,19 @@ fun RabbitStatusCard(
                     showQuickNestBtn = true
                 } else if (cycle.boiteNidPosee) {
                     alertText = strings.alertNestInstalled
-                    alertBg = GreenContainer
-                    alertFg = GreenPrimary
+                    alertBg = MintContainer
+                    alertFg = MintNursing
                 }
             }
             "allaitante" -> {
                 val elapsed = DateHelper.daysElapsed(cycle.dateMiseBasReelle)
                 val vivants = cycle.nombreVivants ?: 0
                 statusLabel = strings.statusNursingElapsed(elapsed)
-                statusColor = GreenPrimary
-                statusBg = GreenContainer
+                statusColor = MintNursing
+                statusBg = MintContainer
                 progress = DateHelper.calculateProgress(cycle.dateMiseBasReelle, cycle.dateSevragePrevue)
                 detailText = strings.nursingDetail(vivants, DateHelper.formatFr(cycle.dateMiseBasReelle))
-                actionLabel = if (elapsed >= 30) strings.actionDoWean else strings.actionWean
+                actionLabel = if (elapsed >= CycleRules.WEAN_EARLY_DAYS) strings.actionDoWean else strings.actionWean
                 actionType = "wean"
 
                 if (elapsed >= 32) {
@@ -126,11 +128,12 @@ fun RabbitStatusCard(
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .clickable { onCardClick(femelle) },
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = glassCardColors(),
+        border = glassBorder()
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -183,6 +186,8 @@ fun RabbitStatusCard(
                     color = statusColor,
                     trackColor = statusColor.copy(alpha = 0.18f)
                 )
+                Spacer(modifier = Modifier.height(10.dp))
+                CycleDatesBlock(femelle)
             }
 
             if (alertText != null) {
@@ -207,13 +212,62 @@ fun RabbitStatusCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { onAction(femelle, "nest") },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
                             Text(strings.actionNestPlaced, fontSize = 11.sp)
                         }
                     }
+                }
+            }
+
+            // Portée précédente encore sous la mère (nouveau cycle déjà lancé)
+            femelle.portee?.let { p ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MintContainer)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = strings.menu.litterUnderMother(p.nombreVivants ?: 0),
+                        color = MintNursing,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Button(
+                        onClick = { onAction(femelle, "wean") },
+                        colors = ButtonDefaults.buttonColors(containerColor = MintNursing),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text(strings.menu.actionWeanLitter, fontSize = 11.sp)
+                    }
+                }
+            }
+
+            // Allaitante sans nouveau cycle : proposer la remise au mâle
+            if (cycle?.statut == "allaitante") {
+                val day = DateHelper.daysElapsed(cycle.dateMiseBasReelle)
+                Spacer(modifier = Modifier.height(8.dp))
+                FilledTonalButton(
+                    onClick = { onAction(femelle, "start") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (day >= CycleRules.remateDays) PinkContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (day >= CycleRules.remateDays) PinkSaillie
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text("💞 " + strings.menu.actionRemate, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
 
@@ -241,9 +295,9 @@ fun RabbitStatusCard(
                 Button(
                     onClick = { onAction(femelle, actionType) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (cycle == null) GreenPrimary else statusColor
+                        containerColor = if (cycle == null) BrandPrimary else statusColor
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(actionLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
@@ -256,6 +310,7 @@ fun RabbitStatusCard(
 fun ReproductionDialog(
     actionType: String?, // "start", "verify", "nest", "birth", "wean", "fail"
     femelle: Femelle?,
+    males: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onStartCycle: (dateSaillie: String, male: String, notes: String) -> Unit,
     onVerifyGestation: (dateVerif: String, isPregnant: Boolean, notes: String) -> Unit,
@@ -273,13 +328,13 @@ fun ReproductionDialog(
     var vivantsInput by remember(femelle, actionType) { mutableStateOf("") }
     var mortsInput by remember(femelle, actionType) { mutableStateOf("0") }
     var sevresInput by remember(femelle, actionType) {
-        mutableStateOf(femelle.cycle?.nombreVivants?.toString() ?: "")
+        mutableStateOf((femelle.nursing ?: femelle.cycle)?.nombreVivants?.toString() ?: "")
     }
     var motifFail by remember(femelle, actionType) { mutableStateOf("fausse_couche") }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 4.dp,
             modifier = Modifier.fillMaxWidth()
@@ -295,6 +350,7 @@ fun ReproductionDialog(
                         Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.matingTip)
+                        MatingChecks(femelle)
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
@@ -311,6 +367,7 @@ fun ReproductionDialog(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
+                        MaleChips(males, maleInput) { maleInput = it }
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = notesInput,
@@ -350,7 +407,7 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = { onVerifyGestation(dateInput, true, notesInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(strings.btnPregnantYes, fontWeight = FontWeight.Bold)
@@ -373,7 +430,7 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = onConfirmNestBox,
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(strings.btnConfirmNest, fontWeight = FontWeight.Bold)
@@ -427,7 +484,7 @@ fun ReproductionDialog(
                                 onConfirmBirth(dateInput, v, m, notesInput)
                             },
                             enabled = vivantsInput.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(strings.btnSaveBirth, fontWeight = FontWeight.Bold)
@@ -462,7 +519,7 @@ fun ReproductionDialog(
                             Text(
                                 text = strings.nestSurvivalRate(sevresCount, nesVivants, pct),
                                 fontSize = 12.5.sp,
-                                color = GreenPrimary,
+                                color = BrandPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -481,7 +538,7 @@ fun ReproductionDialog(
                                 onConfirmWeaning(dateInput, s, notesInput)
                             },
                             enabled = sevresInput.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(strings.btnCloseCycleSuccess, fontWeight = FontWeight.Bold)
@@ -557,12 +614,12 @@ fun CuniTipBox(text: String) {
             .fillMaxWidth()
             .padding(bottom = 12.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(GreenContainer)
+            .background(BrandContainer)
             .padding(10.dp)
     ) {
         Text(
             text = text,
-            color = Color(0xFF1B5E20),
+            color = Color(0xFF1E1B4B),
             fontSize = 12.sp,
             lineHeight = 17.sp
         )

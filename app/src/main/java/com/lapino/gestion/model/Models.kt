@@ -2,6 +2,7 @@ package com.lapino.gestion.model
 
 import com.lapino.gestion.i18n.AppStrings
 import com.lapino.gestion.i18n.AppStringsFR
+import com.lapino.gestion.i18n.menu
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -48,7 +49,55 @@ data class Femelle(
     val clapetNumero: String?,
     val dateNaissance: String?,
     val statut: String, // "vivante", "vendue", "morte"
-    val cycle: CycleReproduction? = null
+    val cycle: CycleReproduction? = null,
+    /** Portée encore sous la mère alors qu'un nouveau cycle (saillie/gestante) a déjà commencé. */
+    val portee: CycleReproduction? = null
+) {
+    /** Cycle d'allaitement en cours, qu'il soit le cycle courant ou la portée précédente. */
+    val nursing: CycleReproduction?
+        get() = portee ?: cycle?.takeIf { it.statut == "allaitante" }
+}
+
+/** Règles du calendrier de reproduction (jours). */
+object CycleRules {
+    const val PALPATION_DAYS = 10
+    const val NEST_DAYS = 28
+    const val GESTATION_DAYS = 31
+    const val WEAN_EARLY_DAYS = 28
+    const val WEAN_LATE_DAYS = 35
+    val REMATE_OPTIONS = listOf(11, 18, 25, 35)
+
+    /** Jours après la mise bas à partir desquels la remise au mâle est conseillée (réglable). */
+    @Volatile
+    var remateDays: Int = 11
+}
+
+data class Male(
+    val id: Long,
+    val numero: String,
+    val race: String?,
+    val dateNaissance: String?,
+    val totalSaillies: Int = 0,
+    val totalMisesBas: Int = 0
+)
+
+data class Vente(
+    val id: Long,
+    val date: String,
+    val nombre: Int,
+    val prixUnitaire: Double,
+    val notes: String?
+) {
+    val total: Double get() = nombre * prixUnitaire
+}
+
+data class AchatAliment(
+    val id: Long,
+    val alimentId: Long?,
+    val alimentNom: String?,
+    val date: String,
+    val quantiteKg: Double,
+    val prix: Double
 )
 
 data class Vaccin(
@@ -91,7 +140,8 @@ enum class ReproAlertType {
     PALPATION,
     BOITE_NID,
     MISE_BAS,
-    SEVRAGE
+    SEVRAGE,
+    REMISE_MALE
 }
 
 data class ReproAlert(
@@ -110,6 +160,7 @@ data class ReproAlert(
         ReproAlertType.BOITE_NID -> strings.alertBadgeUrgent(elapsed)
         ReproAlertType.MISE_BAS -> strings.alertBadgeBirth
         ReproAlertType.SEVRAGE -> strings.alertBadgeDay(elapsed)
+        ReproAlertType.REMISE_MALE -> strings.alertBadgeDay(elapsed)
     }
 
     fun getTitle(strings: AppStrings): String = when (type) {
@@ -124,6 +175,7 @@ data class ReproAlert(
             }
         }
         ReproAlertType.SEVRAGE -> strings.alertTitleWeaning(femelle.numero)
+        ReproAlertType.REMISE_MALE -> strings.menu.alertRemateTitle(femelle.numero)
     }
 
     fun getSubtitle(strings: AppStrings): String = when (type) {
@@ -131,6 +183,7 @@ data class ReproAlert(
         ReproAlertType.BOITE_NID -> strings.alertSubNest(max(0, daysLeft ?: 3))
         ReproAlertType.MISE_BAS -> strings.alertSubBirth
         ReproAlertType.SEVRAGE -> strings.alertSubWeaning(cycle.nombreVivants ?: 0)
+        ReproAlertType.REMISE_MALE -> strings.menu.alertRemateSub(elapsed)
     }
 }
 

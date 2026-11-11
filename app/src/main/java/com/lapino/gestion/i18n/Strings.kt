@@ -306,7 +306,7 @@ object AppStringsFR : AppStrings {
     override fun alertPalpationNow(days: Int): String =
         "🔍 Palpation à réaliser ! (J$days - ampoules fœtales palpables)"
     override fun alertPalpationAdvised(days: Int): String =
-        "Palpation conseillée à J11 (dans ${days}j)"
+        "Palpation conseillée à J10 (dans ${days}j)"
     override fun alertNestUrgent(days: Int): String =
         "📦 Urgent (J$days) : Poser la boîte à nid avec paille !"
     override val alertNestInstalled: String = "✓ Boîte à nid propre installée"
@@ -383,7 +383,7 @@ object AppStringsFR : AppStrings {
     override val dialogMatingTitle: String = "🌪️ Déclarer une Saillie"
     override fun rabbitIndicator(num: String): String = "Lapine : $num"
     override val matingTip: String =
-        "💡 Conseil : Amenez toujours la lapine dans la loge du mâle (jamais l'inverse). La palpation abdominale sera programmée à J+11."
+        "💡 Conseil : Amenez toujours la lapine dans la loge du mâle (jamais l'inverse). La palpation abdominale sera programmée à J+10."
     override val inputMatingDate: String = "Date de saillie (AAAA-MM-JJ)"
     override val inputMale: String = "Mâle reproducteur (Nom / N°)"
     override val inputMalePlaceholder: String = "Ex: M01 - Rex"
@@ -536,7 +536,7 @@ object AppStringsAR : AppStrings {
     override fun alertPalpationNow(days: Int): String =
         "🔍 يجب إجراء الجس! (يوم $days - فحص نمو الأجنة)"
     override fun alertPalpationAdvised(days: Int): String =
-        "يُنصح بالجس في اليوم 11 (خلال $days يوم)"
+        "يُنصح بالجس في اليوم 10 (خلال $days يوم)"
     override fun alertNestUrgent(days: Int): String =
         "📦 عاجل (يوم $days): وضع صندوق الولادة مع القش!"
     override val alertNestInstalled: String = "✓ تم تركيب صندوق الولادة النظيف"
@@ -613,7 +613,7 @@ object AppStringsAR : AppStrings {
     override val dialogMatingTitle: String = "🌪️ تسجيل عملية التلقيح"
     override fun rabbitIndicator(num: String): String = "الأرنبة : $num"
     override val matingTip: String =
-        "💡 نصيحة: انقل دائماً الأنثى إلى قفص الذكر (وليس العكس). سيتم جدولة فحص الجس في اليوم 11."
+        "💡 نصيحة: انقل دائماً الأنثى إلى قفص الذكر (وليس العكس). سيتم جدولة فحص الجس في اليوم 10."
     override val inputMatingDate: String = "تاريخ التلقيح (سنة-شهر-يوم)"
     override val inputMale: String = "الذكر الملقح (الاسم / الرقم)"
     override val inputMalePlaceholder: String = "مثال: M01 - ركس"

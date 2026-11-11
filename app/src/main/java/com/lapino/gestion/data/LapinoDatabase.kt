@@ -12,7 +12,7 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", null, 2) {
+class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", null, 3) {
 
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
@@ -41,6 +41,16 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
         for (sql in migrations) {
             try {
                 db.execSQL(sql)
+            } catch (_: Exception) {
+            }
+        }
+        if (oldVersion < 3) {
+            try {
+                db.execSQL(
+                    "INSERT INTO males (numero) SELECT DISTINCT TRIM(male_numero) FROM cycles_reproduction " +
+                        "WHERE male_numero IS NOT NULL AND TRIM(male_numero) <> '' " +
+                        "AND TRIM(male_numero) NOT IN (SELECT numero FROM males);"
+                )
             } catch (_: Exception) {
             }
         }
@@ -137,6 +147,40 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_vaccinations_femelle ON vaccinations_femelles(femelle_id);")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_vaccinations_date ON vaccinations_femelles(date_prochain);")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_cycles_femelle ON cycles_reproduction(femelle_id);")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS males (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero TEXT NOT NULL,
+                race TEXT,
+                date_naissance TEXT,
+                statut TEXT DEFAULT 'vivant'
+            );
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS ventes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date_vente TEXT NOT NULL,
+                nombre INTEGER NOT NULL,
+                prix_unitaire REAL NOT NULL DEFAULT 0,
+                notes TEXT
+            );
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS achats_aliment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                aliment_id INTEGER,
+                date_achat TEXT NOT NULL,
+                quantite_kg REAL NOT NULL DEFAULT 0,
+                prix REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (aliment_id) REFERENCES aliments(id) ON DELETE SET NULL
+            );
+            """.trimIndent()
+        )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_cycles_statut ON cycles_reproduction(statut);")
     }
 
@@ -191,6 +235,21 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
             put("duree_jours", 180)
         })
 
+        db.insert("vaccins", null, ContentValues().apply {
+            put("nom", "Entérotoxémie")
+            put("duree_jours", 180)
+        })
+        // Mâles
+        db.insert("males", null, ContentValues().apply {
+            put("numero", "M01 - Rex")
+            put("race", "Rex")
+            put("date_naissance", "2025-01-10")
+        })
+        db.insert("males", null, ContentValues().apply {
+            put("numero", "M02 - Géant")
+            put("race", "Géant des Flandres")
+            put("date_naissance", "2025-02-05")
+        })
         // Vaccinations
         db.insert("vaccinations_femelles", null, ContentValues().apply {
             put("femelle_id", f1)
@@ -382,7 +441,56 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
             )
         }
         cursor.close()
-        return list
+
+        // Portée encore sous la mère alors qu'un cycle plus récent est en cours
+        val nursing = getNursingCyclesByFemelle()
+        if (nursing.isEmpty()) return list
+        return list.map { f ->
+            val n = nursing[f.id]
+            if (n != null && f.cycle != null && f.cycle.id != n.id) f.copy(portee = n) else f
+        }
+    }
+
+    private fun getNursingCyclesByFemelle(): Map<Long, CycleReproduction> {
+        val map = LinkedHashMap<Long, CycleReproduction>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT id, femelle_id, male_numero, date_saillie, date_palpation_prevue, date_palpation_reelle,
+                   resultat_palpation, date_boite_nid_prevue, boite_nid_posee, date_mise_bas_prevue,
+                   date_mise_bas_reelle, nombre_vivants, nombre_morts, date_sevrage_prevue,
+                   date_sevrage_reelle, nombre_sevres, statut, motif_echec, notes
+            FROM cycles_reproduction
+            WHERE statut = 'allaitante'
+            ORDER BY date_saillie ASC, id ASC
+            """.trimIndent(),
+            null
+        )
+        while (cursor.moveToNext()) {
+            val c = CycleReproduction(
+                id = cursor.getLong(0),
+                femelleId = cursor.getLong(1),
+                maleNumero = cursor.getStringOrNull(2),
+                dateSaillie = cursor.getString(3) ?: "",
+                datePalpationPrevue = cursor.getStringOrNull(4),
+                datePalpationReelle = cursor.getStringOrNull(5),
+                resultatPalpation = cursor.getStringOrNull(6),
+                dateBoiteNidPrevue = cursor.getStringOrNull(7),
+                boiteNidPosee = (cursor.getIntOrNull(8) ?: 0) == 1,
+                dateMiseBasPrevue = cursor.getString(9) ?: "",
+                dateMiseBasReelle = cursor.getStringOrNull(10),
+                nombreVivants = cursor.getIntOrNull(11),
+                nombreMorts = cursor.getIntOrNull(12),
+                dateSevragePrevue = cursor.getStringOrNull(13),
+                dateSevrageReelle = cursor.getStringOrNull(14),
+                nombreSevres = cursor.getIntOrNull(15),
+                statut = cursor.getString(16) ?: "",
+                motifEchec = cursor.getStringOrNull(17),
+                notes = cursor.getStringOrNull(18)
+            )
+            map[c.femelleId] = c
+        }
+        cursor.close()
+        return map
     }
 
     fun getFemelleById(id: Long): Femelle? {
@@ -416,9 +524,9 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
     // ========== ACTIONS DE REPRODUCTION (CUNICULICULTURE) ==========
 
     fun startCycle(femelleId: Long, dateSaillie: String, maleNumero: String?, notes: String?): Long {
-        val datePalpation = DateHelper.addDays(dateSaillie, 11)
-        val dateBoiteNid = DateHelper.addDays(dateSaillie, 28)
-        val dateMiseBas = DateHelper.addDays(dateSaillie, 31)
+        val datePalpation = DateHelper.addDays(dateSaillie, CycleRules.PALPATION_DAYS)
+        val dateBoiteNid = DateHelper.addDays(dateSaillie, CycleRules.NEST_DAYS)
+        val dateMiseBas = DateHelper.addDays(dateSaillie, CycleRules.GESTATION_DAYS)
 
         val cv = ContentValues().apply {
             put("femelle_id", femelleId)
@@ -455,9 +563,18 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
     }
 
     fun confirmBirth(cycleId: Long, dateNaissance: String, vivants: Int, morts: Int, notes: String?) {
-        val dateSevrage = DateHelper.addDays(dateNaissance, 35)
+        val dateSevrage = DateHelper.addDays(dateNaissance, CycleRules.WEAN_LATE_DAYS)
         val existingNotes = getCycleNotes(cycleId)
         val mergedNotes = mergeNotes(existingNotes, notes)
+        // Une portée précédente non sevrée est clôturée d'office à la nouvelle mise bas
+        writableDatabase.execSQL(
+            "UPDATE cycles_reproduction SET statut = 'termine', " +
+                "date_sevrage_reelle = COALESCE(date_sevrage_reelle, ?), " +
+                "nombre_sevres = COALESCE(nombre_sevres, nombre_vivants) " +
+                "WHERE statut = 'allaitante' AND id <> ? " +
+                "AND femelle_id = (SELECT femelle_id FROM cycles_reproduction WHERE id = ?)",
+            arrayOf<Any>(dateNaissance, cycleId, cycleId)
+        )
         val cv = ContentValues().apply {
             put("date_mise_bas_reelle", dateNaissance)
             put("nombre_vivants", max(0, vivants))
@@ -513,6 +630,21 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
         val femelles = getFemellesWithStatus()
 
         for (f in femelles) {
+            // Portée précédente encore sous la mère : sevrage à surveiller
+            f.portee?.let { p ->
+                val e = DateHelper.daysElapsed(p.dateMiseBasReelle)
+                if (e >= CycleRules.WEAN_EARLY_DAYS) {
+                    alerts.add(
+                        ReproAlert(
+                            type = ReproAlertType.SEVRAGE,
+                            femelle = f,
+                            cycle = p,
+                            actionType = "wean",
+                            elapsed = e
+                        )
+                    )
+                }
+            }
             val c = f.cycle ?: continue
             when (c.statut) {
                 "saillie" -> {
@@ -574,7 +706,18 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
                 }
                 "allaitante" -> {
                     val elapsed = DateHelper.daysElapsed(c.dateMiseBasReelle)
-                    if (elapsed >= 30) {
+                    if (elapsed >= CycleRules.remateDays) {
+                        alerts.add(
+                            ReproAlert(
+                                type = ReproAlertType.REMISE_MALE,
+                                femelle = f,
+                                cycle = c,
+                                actionType = "start",
+                                elapsed = elapsed
+                            )
+                        )
+                    }
+                    if (elapsed >= CycleRules.WEAN_EARLY_DAYS) {
                         alerts.add(
                             ReproAlert(
                                 type = ReproAlertType.SEVRAGE,
@@ -604,6 +747,10 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
         var lapereaux = 0
 
         for (f in femelles) {
+            f.portee?.let {
+                allaitantes++
+                lapereaux += it.nombreVivants ?: 0
+            }
             when (f.cycle?.statut) {
                 null -> repos++
                 "saillie" -> saillie++
@@ -858,6 +1005,189 @@ class LapinoDatabase(context: Context) : SQLiteOpenHelper(context, "lapino.db", 
 
     fun deleteAliment(id: Long) {
         writableDatabase.delete("aliments", "id = ?", arrayOf(id.toString()))
+    }
+
+    fun vaccinateAll(vaccinId: Long, dateVaccination: String): Int {
+        val ids = getFemellesWithStatus().map { it.id }
+        ids.forEach { addVaccination(it, vaccinId, dateVaccination) }
+        return ids.size
+    }
+
+    /** Par vaccin : (dernière date de vaccination, prochaine date de rappel) sur les lapines vivantes. */
+    fun getVaccinHerdStatus(): Map<Long, Pair<String, String>> {
+        val map = HashMap<Long, Pair<String, String>>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT vf.vaccin_id, MAX(vf.date_vaccination), MAX(vf.date_prochain)
+            FROM vaccinations_femelles vf
+            JOIN femelles f ON f.id = vf.femelle_id AND f.statut = 'vivante'
+            GROUP BY vf.vaccin_id
+            """.trimIndent(),
+            null
+        )
+        while (cursor.moveToNext()) {
+            map[cursor.getLong(0)] = (cursor.getString(1) ?: "") to (cursor.getString(2) ?: "")
+        }
+        cursor.close()
+        return map
+    }
+
+    // ========== MÂLES ==========
+
+    fun getAllMales(): List<Male> {
+        val list = mutableListOf<Male>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT m.id, m.numero, m.race, m.date_naissance,
+                   (SELECT COUNT(*) FROM cycles_reproduction c WHERE TRIM(c.male_numero) = m.numero),
+                   (SELECT COUNT(*) FROM cycles_reproduction c
+                     WHERE TRIM(c.male_numero) = m.numero AND c.date_mise_bas_reelle IS NOT NULL)
+            FROM males m
+            WHERE m.statut IS NULL OR m.statut = 'vivant'
+            ORDER BY m.numero
+            """.trimIndent(),
+            null
+        )
+        while (cursor.moveToNext()) {
+            list.add(
+                Male(
+                    id = cursor.getLong(0),
+                    numero = cursor.getString(1) ?: "",
+                    race = cursor.getStringOrNull(2),
+                    dateNaissance = cursor.getStringOrNull(3),
+                    totalSaillies = cursor.getInt(4),
+                    totalMisesBas = cursor.getInt(5)
+                )
+            )
+        }
+        cursor.close()
+        return list
+    }
+
+    fun saveMale(id: Long?, numero: String, race: String?, dateNaissance: String?) {
+        val cv = ContentValues().apply {
+            put("numero", numero.trim())
+            put("race", race?.trim()?.takeIf { it.isNotBlank() })
+            put("date_naissance", dateNaissance?.trim()?.takeIf { it.isNotBlank() })
+        }
+        if (id == null) {
+            cv.put("statut", "vivant")
+            writableDatabase.insert("males", null, cv)
+        } else {
+            writableDatabase.update("males", cv, "id = ?", arrayOf(id.toString()))
+        }
+    }
+
+    fun deleteMale(id: Long) {
+        writableDatabase.delete("males", "id = ?", arrayOf(id.toString()))
+    }
+
+    // ========== VENTES ==========
+
+    fun getAllVentes(): List<Vente> {
+        val list = mutableListOf<Vente>()
+        val cursor = readableDatabase.rawQuery(
+            "SELECT id, date_vente, nombre, prix_unitaire, notes FROM ventes ORDER BY date_vente DESC, id DESC",
+            null
+        )
+        while (cursor.moveToNext()) {
+            list.add(
+                Vente(
+                    id = cursor.getLong(0),
+                    date = cursor.getString(1) ?: "",
+                    nombre = cursor.getInt(2),
+                    prixUnitaire = cursor.getDouble(3),
+                    notes = cursor.getStringOrNull(4)
+                )
+            )
+        }
+        cursor.close()
+        return list
+    }
+
+    fun addVente(date: String, nombre: Int, prixUnitaire: Double, notes: String?) {
+        val cv = ContentValues().apply {
+            put("date_vente", date)
+            put("nombre", max(0, nombre))
+            put("prix_unitaire", max(0.0, prixUnitaire))
+            put("notes", notes?.takeIf { it.isNotBlank() })
+        }
+        writableDatabase.insert("ventes", null, cv)
+    }
+
+    fun deleteVente(id: Long) {
+        writableDatabase.delete("ventes", "id = ?", arrayOf(id.toString()))
+    }
+
+    // ========== ACHATS D'ALIMENT ==========
+
+    fun getAllAchats(): List<AchatAliment> {
+        val list = mutableListOf<AchatAliment>()
+        val cursor = readableDatabase.rawQuery(
+            """
+            SELECT a.id, a.aliment_id, al.nom, a.date_achat, a.quantite_kg, a.prix
+            FROM achats_aliment a
+            LEFT JOIN aliments al ON al.id = a.aliment_id
+            ORDER BY a.date_achat DESC, a.id DESC
+            """.trimIndent(),
+            null
+        )
+        while (cursor.moveToNext()) {
+            list.add(
+                AchatAliment(
+                    id = cursor.getLong(0),
+                    alimentId = if (cursor.isNull(1)) null else cursor.getLong(1),
+                    alimentNom = cursor.getStringOrNull(2),
+                    date = cursor.getString(3) ?: "",
+                    quantiteKg = cursor.getDouble(4),
+                    prix = cursor.getDouble(5)
+                )
+            )
+        }
+        cursor.close()
+        return list
+    }
+
+    /** Enregistre l'achat et ajoute la quantité au stock de l'aliment choisi. */
+    fun addAchat(alimentId: Long?, date: String, quantiteKg: Double, prix: Double) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val cv = ContentValues().apply {
+                if (alimentId != null) put("aliment_id", alimentId) else putNull("aliment_id")
+                put("date_achat", date)
+                put("quantite_kg", max(0.0, quantiteKg))
+                put("prix", max(0.0, prix))
+            }
+            db.insert("achats_aliment", null, cv)
+            if (alimentId != null) {
+                db.execSQL(
+                    "UPDATE aliments SET stock_kg = stock_kg + ? WHERE id = ?",
+                    arrayOf<Any>(max(0.0, quantiteKg), alimentId)
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Supprime l'achat et retire la quantité correspondante du stock (sans passer sous zéro). */
+    fun deleteAchat(achat: AchatAliment) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("achats_aliment", "id = ?", arrayOf(achat.id.toString()))
+            if (achat.alimentId != null) {
+                db.execSQL(
+                    "UPDATE aliments SET stock_kg = MAX(0, stock_kg - ?) WHERE id = ?",
+                    arrayOf<Any>(achat.quantiteKg, achat.alimentId)
+                )
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
     }
 
     private fun Cursor.getStringOrNull(index: Int): String? =

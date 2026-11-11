@@ -2,18 +2,28 @@ package com.lapino.gestion
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,12 +53,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         db = LapinoDatabase(applicationContext)
+        AppPrefs.loadRules(applicationContext)
 
         setContent {
             val context = LocalContext.current
             var currentLang by remember { mutableStateOf(LanguageManager.getSavedLanguage(context)) }
             val strings = if (currentLang == AppLanguage.AR) AppStringsAR else AppStringsFR
-            var isDark by remember { mutableStateOf(false) }
+            var isDark by remember { mutableStateOf(AppPrefs.isDark(context)) }
+
+            // Bord à bord : le fond aurora passe sous les barres système
+            DisposableEffect(isDark) {
+                val transparent = android.graphics.Color.TRANSPARENT
+                val style = if (isDark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
 
             CompositionLocalProvider(
                 LocalAppLanguage provides currentLang,
@@ -60,7 +79,10 @@ class MainActivity : ComponentActivity() {
                         db = db,
                         isDark = isDark,
                         currentLang = currentLang,
-                        onToggleDark = { isDark = !isDark },
+                        onToggleDark = {
+                            isDark = !isDark
+                            AppPrefs.setDark(context, isDark)
+                        },
                         onLanguageChanged = { newLang ->
                             currentLang = newLang
                             LanguageManager.saveLanguage(context, newLang)
@@ -82,9 +104,17 @@ fun LapinoApp(
     onLanguageChanged: (AppLanguage) -> Unit
 ) {
     val strings = LocalAppStrings.current
-    var currentTab by remember { mutableIntStateOf(0) }
+    val ms = strings.menu
+    val context = LocalContext.current
+
+    // Navigation : "home" (tuiles) puis un écran par tuile
+    var screen by remember { mutableStateOf("home") }
     var selectedFemelleDetailId by remember { mutableStateOf<Long?>(null) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    var farmName by remember { mutableStateOf(AppPrefs.farmName(context)) }
+    var showSettings by remember { mutableStateOf(false) }
+    var vaccinateAllTarget by remember { mutableStateOf<Vaccin?>(null) }
+    var showPurchaseDialog by remember { mutableStateOf(false) }
 
     // États chargés depuis SQLite
     val globalStats = remember(refreshTrigger) { db.getGlobalStats() }
@@ -94,6 +124,11 @@ fun LapinoApp(
     val aliments = remember(refreshTrigger) { db.getAllAliments() }
     val clapets = remember(refreshTrigger) { db.getAllClapets() }
     val vaccins = remember(refreshTrigger) { db.getAllVaccins() }
+    val males = remember(refreshTrigger) { db.getAllMales() }
+    val ventes = remember(refreshTrigger) { db.getAllVentes() }
+    val achats = remember(refreshTrigger) { db.getAllAchats() }
+    val vaccinStatus = remember(refreshTrigger) { db.getVaccinHerdStatus() }
+    val alimentsBas = aliments.filter { it.joursRestants <= 7 }
 
     // État Modal Reproduction
     var activeReproAction by remember { mutableStateOf<String?>(null) }
@@ -104,172 +139,151 @@ fun LapinoApp(
     var editingFemelle by remember { mutableStateOf<Femelle?>(null) }
 
     val triggerReload: () -> Unit = { refreshTrigger += 1 }
-
-    BackHandler(enabled = selectedFemelleDetailId != null) {
-        selectedFemelleDetailId = null
+    val openCycleAction: (Femelle, String) -> Unit = { f, action ->
+        activeReproFemelle = f
+        activeReproAction = action
+    }
+    val goBack: () -> Unit = {
+        if (selectedFemelleDetailId != null) selectedFemelleDetailId = null else screen = "home"
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = if (selectedFemelleDetailId != null) strings.femaleDetailTitle else strings.appTitle,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                },
-                navigationIcon = {
-                    if (selectedFemelleDetailId != null) {
-                        IconButton(onClick = { selectedFemelleDetailId = null }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = strings.back,
-                                tint = Color.White
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    // Bouton de bascule linguistique Français / العربية
-                    Surface(
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                val next = if (currentLang == AppLanguage.FR) AppLanguage.AR else AppLanguage.FR
-                                onLanguageChanged(next)
-                            },
-                        color = Color.White.copy(alpha = 0.22f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (currentLang == AppLanguage.FR) "🇸🇦 عربي" else "🇫🇷 FR",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    IconButton(onClick = onToggleDark) {
-                        Icon(
-                            imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = strings.themeToggleDesc,
-                            tint = Color.White
+    BackHandler(enabled = selectedFemelleDetailId != null || screen != "home") { goBack() }
+
+    val target = if (selectedFemelleDetailId != null) "detail" else screen
+    val title = when (target) {
+        "detail" -> strings.femaleDetailTitle
+        "alerts" -> ms.notifications
+        "femelles" -> ms.tileFemales
+        "males" -> ms.tileMales
+        "vaccins" -> ms.tileVaccines
+        "litters" -> ms.tileLitters
+        "feed" -> ms.tileFeed
+        "cages" -> ms.tileCages
+        "tips" -> ms.tileTips
+        "sales" -> ms.tileSales
+        else -> ""
+    }
+
+    AuroraBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                if (target != "home") {
+                    TopAppBar(
+                        title = { Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp) },
+                        navigationIcon = {
+                            Box(modifier = Modifier.padding(start = 12.dp, end = 10.dp)) {
+                                GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, strings.back, onClick = goBack)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent
                         )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GreenPrimary
-                )
-            )
-        },
-        bottomBar = {
-            if (selectedFemelleDetailId == null) {
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = currentTab == 0,
-                        onClick = { currentTab = 0 },
-                        icon = { Icon(Icons.Default.Dashboard, contentDescription = strings.navHome) },
-                        label = { Text(strings.navHome) }
-                    )
-                    NavigationBarItem(
-                        selected = currentTab == 1,
-                        onClick = { currentTab = 1 },
-                        icon = { Icon(Icons.Default.Pets, contentDescription = strings.navRabbits(femelles.size)) },
-                        label = { Text(strings.navRabbits(femelles.size)) }
-                    )
-                    NavigationBarItem(
-                        selected = currentTab == 2,
-                        onClick = { currentTab = 2 },
-                        icon = { Icon(Icons.Default.HomeWork, contentDescription = strings.navElevage) },
-                        label = { Text(strings.navElevage) }
-                    )
-                    NavigationBarItem(
-                        selected = currentTab == 3,
-                        onClick = { currentTab = 3 },
-                        icon = { Icon(Icons.Default.MedicalServices, contentDescription = strings.navVaccines) },
-                        label = { Text(strings.navVaccines) }
                     )
                 }
-            }
-        },
-        floatingActionButton = {
-            if (selectedFemelleDetailId == null && (currentTab == 0 || currentTab == 1)) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        editingFemelle = null
-                        showAddEditFemelle = true
-                    },
-                    containerColor = GreenPrimary,
-                    contentColor = Color.White,
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text(strings.fabNewRabbit, fontWeight = FontWeight.Bold) }
-                )
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            if (selectedFemelleDetailId != null) {
-                val detailFemelle = remember(selectedFemelleDetailId, refreshTrigger) {
-                    db.getFemelleById(selectedFemelleDetailId!!)
-                }
-                if (detailFemelle == null) {
-                    selectedFemelleDetailId = null
-                } else {
-                    FemelleDetailView(
-                        db = db,
-                        femelle = detailFemelle,
-                        vaccins = vaccins,
-                        refreshKey = refreshTrigger,
-                        onEditFemelle = {
-                            editingFemelle = detailFemelle
+            },
+            floatingActionButton = {
+                if (target == "femelles") {
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            editingFemelle = null
                             showAddEditFemelle = true
                         },
-                        onDeleteFemelle = {
-                            db.deleteFemelle(detailFemelle.id)
-                            selectedFemelleDetailId = null
-                            triggerReload()
-                        },
-                        onActionCycle = { f, action ->
-                            activeReproFemelle = f
-                            activeReproAction = action
-                        },
-                        onVaccinationAdded = triggerReload
+                        containerColor = BrandPrimary,
+                        contentColor = Color.White,
+                        shape = RoundedCornerShape(20.dp),
+                        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                        text = { Text(strings.fabNewRabbit, fontWeight = FontWeight.Bold) }
                     )
                 }
-            } else {
-                when (currentTab) {
-                    0 -> DashboardTab(
+            }
+        ) { innerPadding ->
+            AnimatedContent(
+                targetState = target,
+                transitionSpec = {
+                    (fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 14 }) togetherWith fadeOut(tween(140))
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .imePadding(),
+                label = "screen"
+            ) { current ->
+                when (current) {
+                    "detail" -> {
+                        val id = selectedFemelleDetailId
+                        val detailFemelle = remember(id, refreshTrigger) { id?.let { db.getFemelleById(it) } }
+                        if (detailFemelle == null) {
+                            if (id != null) selectedFemelleDetailId = null
+                            Box(Modifier.fillMaxSize())
+                        } else {
+                            FemelleDetailView(
+                                db = db,
+                                femelle = detailFemelle,
+                                vaccins = vaccins,
+                                refreshKey = refreshTrigger,
+                                onEditFemelle = {
+                                    editingFemelle = detailFemelle
+                                    showAddEditFemelle = true
+                                },
+                                onDeleteFemelle = {
+                                    db.deleteFemelle(detailFemelle.id)
+                                    selectedFemelleDetailId = null
+                                    triggerReload()
+                                },
+                                onActionCycle = openCycleAction,
+                                onVaccinationAdded = triggerReload
+                            )
+                        }
+                    }
+                    "alerts" -> DashboardTab(
                         stats = globalStats,
                         reproAlerts = reproAlerts,
-                        alimentsBas = aliments.filter { it.joursRestants <= 7 },
+                        alimentsBas = alimentsBas,
                         vaccineAlerts = vaccineAlerts,
                         femelles = femelles,
-                        onActionCycle = { f, action ->
-                            activeReproFemelle = f
-                            activeReproAction = action
-                        },
+                        onActionCycle = openCycleAction,
                         onOpenFemelle = { f -> selectedFemelleDetailId = f.id },
-                        onGoToStocks = { currentTab = 2 }
+                        onGoToStocks = { screen = "feed" }
                     )
-                    1 -> FemellesListTab(
+                    "femelles" -> FemellesListTab(
                         femelles = femelles,
-                        onActionCycle = { f, action ->
-                            activeReproFemelle = f
-                            activeReproAction = action
-                        },
+                        onActionCycle = openCycleAction,
                         onOpenFemelle = { f -> selectedFemelleDetailId = f.id }
                     )
-                    2 -> ElevageStocksTab(
+                    "males" -> MalesScreen(
+                        males = males,
+                        onSave = { id, numero, race, naissance ->
+                            db.saveMale(id, numero, race, naissance)
+                            triggerReload()
+                        },
+                        onDelete = { id ->
+                            db.deleteMale(id)
+                            triggerReload()
+                        }
+                    )
+                    "vaccins" -> VaccinsTab(
+                        vaccins = vaccins,
+                        vaccineAlerts = vaccineAlerts,
+                        onAddVaccin = { nom, duree ->
+                            db.addVaccin(nom, duree)
+                            triggerReload()
+                        },
+                        onDeleteVaccin = { id ->
+                            db.deleteVaccin(id)
+                            triggerReload()
+                        },
+                        onOpenFemelle = { fId -> selectedFemelleDetailId = fId },
+                        herdStatus = vaccinStatus,
+                        onVaccinateAll = { v -> vaccinateAllTarget = v }
+                    )
+                    "litters" -> LittersScreen(
+                        femelles = femelles,
+                        onWean = { f -> openCycleAction(f, "wean") },
+                        onOpenFemelle = { f -> selectedFemelleDetailId = f.id }
+                    )
+                    "feed", "cages" -> ElevageStocksTab(
                         clapets = clapets,
                         aliments = aliments,
                         onAddClapet = { num ->
@@ -287,30 +301,97 @@ fun LapinoApp(
                         onDeleteAliment = { id ->
                             db.deleteAliment(id)
                             triggerReload()
+                        },
+                        section = current,
+                        extraContent = {
+                            feedPurchaseItems(
+                                achats = achats,
+                                header = { FeedPurchasesHeader(achats) { showPurchaseDialog = true } },
+                                row = { i, a ->
+                                    FeedPurchaseRow(i, a) {
+                                        db.deleteAchat(a)
+                                        triggerReload()
+                                    }
+                                }
+                            )
                         }
                     )
-                    3 -> VaccinsTab(
-                        vaccins = vaccins,
-                        vaccineAlerts = vaccineAlerts,
-                        onAddVaccin = { nom, duree ->
-                            db.addVaccin(nom, duree)
+                    "tips" -> TipsScreen()
+                    "sales" -> SalesScreen(
+                        ventes = ventes,
+                        totalAchats = achats.sumOf { it.prix },
+                        onAdd = { date, nombre, prix, notes ->
+                            db.addVente(date, nombre, prix, notes)
                             triggerReload()
                         },
-                        onDeleteVaccin = { id ->
-                            db.deleteVaccin(id)
+                        onDelete = { id ->
+                            db.deleteVente(id)
                             triggerReload()
-                        },
-                        onOpenFemelle = { fId -> selectedFemelleDetailId = fId }
+                        }
+                    )
+                    else -> HomeScreen(
+                        farmName = farmName,
+                        stats = globalStats,
+                        malesCount = males.size,
+                        littersCount = femelles.count { it.nursing != null },
+                        reproAlertsCount = reproAlerts.size,
+                        vaccineAlertsCount = vaccineAlerts.size,
+                        lowFeedCount = alimentsBas.size,
+                        salesTotal = ventes.sumOf { it.total },
+                        onOpen = { key -> screen = key },
+                        onOpenSettings = { showSettings = true }
                     )
                 }
             }
         }
     }
 
+    if (showSettings) {
+        SettingsDialog(
+            farmName = farmName,
+            isDark = isDark,
+            currentLang = currentLang,
+            onFarmNameChange = {
+                farmName = it
+                AppPrefs.setFarmName(context, it)
+            },
+            onToggleDark = onToggleDark,
+            onLanguageChanged = onLanguageChanged,
+            onRulesChanged = triggerReload,
+            onDismiss = { showSettings = false }
+        )
+    }
+
+    vaccinateAllTarget?.let { v ->
+        VaccinateAllDialog(
+            vaccin = v,
+            femellesCount = femelles.size,
+            onDismiss = { vaccinateAllTarget = null },
+            onConfirm = { date ->
+                db.vaccinateAll(v.id, date)
+                vaccinateAllTarget = null
+                triggerReload()
+            }
+        )
+    }
+
+    if (showPurchaseDialog) {
+        FeedPurchaseDialog(
+            aliments = aliments,
+            onDismiss = { showPurchaseDialog = false },
+            onSave = { alimentId, date, qty, prix ->
+                db.addAchat(alimentId, date, qty, prix)
+                showPurchaseDialog = false
+                triggerReload()
+            }
+        )
+    }
+
     // Modal unifié pour toutes les actions du cycle reproductif
     ReproductionDialog(
         actionType = activeReproAction,
         femelle = activeReproFemelle,
+        males = males.map { it.numero },
         onDismiss = {
             activeReproAction = null
             activeReproFemelle = null
@@ -344,7 +425,7 @@ fun LapinoApp(
             activeReproAction = null
         },
         onConfirmWeaning = { dateSevrage, sevres, notes ->
-            activeReproFemelle?.cycle?.let { c ->
+            activeReproFemelle?.let { it.portee ?: it.cycle }?.let { c ->
                 db.confirmWeaning(c.id, dateSevrage, sevres, notes)
                 triggerReload()
             }
@@ -402,7 +483,7 @@ fun DashboardTab(
                     title = strings.statActiveRabbits,
                     value = stats.totalFemelles.toString(),
                     subtitle = strings.statOccupiedCages(stats.clapetsRemplis, stats.clapetsTotal),
-                    color = GreenPrimary,
+                    color = BrandPrimary,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
@@ -426,7 +507,7 @@ fun DashboardTab(
                 StatusPill(strings.pillRest(stats.enRepos), Color(0xFFEEEEEE), Color(0xFF424242))
                 StatusPill(strings.pillMating(stats.enSaillie), PinkContainer, PinkSaillie)
                 StatusPill(strings.pillPregnant(stats.gestantes), BlueContainer, BlueGestante)
-                StatusPill(strings.pillNursing(stats.allaitantes), GreenContainer, GreenPrimary)
+                StatusPill(strings.pillNursing(stats.allaitantes), MintContainer, MintNursing)
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -447,13 +528,15 @@ fun DashboardTab(
                     ReproAlertType.BOITE_NID -> RedContainer
                     ReproAlertType.PALPATION -> OrangeContainer
                     ReproAlertType.MISE_BAS -> BlueContainer
-                    ReproAlertType.SEVRAGE -> GreenContainer
+                    ReproAlertType.SEVRAGE -> MintContainer
+                    ReproAlertType.REMISE_MALE -> PinkContainer
                 }
                 val fg = when (alert.type) {
                     ReproAlertType.BOITE_NID -> RedCritical
                     ReproAlertType.PALPATION -> OrangeAlert
                     ReproAlertType.MISE_BAS -> BlueGestante
-                    ReproAlertType.SEVRAGE -> GreenPrimary
+                    ReproAlertType.SEVRAGE -> MintNursing
+                    ReproAlertType.REMISE_MALE -> PinkSaillie
                 }
                 Card(
                     modifier = Modifier
@@ -637,7 +720,7 @@ fun FemellesListTab(
                 "repos" -> f.cycle == null
                 "saillie" -> f.cycle?.statut == "saillie"
                 "gestante" -> f.cycle?.statut == "gestante"
-                "allaitante" -> f.cycle?.statut == "allaitante"
+                "allaitante" -> f.nursing != null
                 else -> true
             }
             matchQuery && matchFilter
@@ -721,8 +804,9 @@ fun FemelleDetailView(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(24.dp),
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -783,8 +867,9 @@ fun FemelleDetailView(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(24.dp),
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -797,10 +882,10 @@ fun FemelleDetailView(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        MiniKpiBox("${stats.tauxFertilite}%", strings.kpiFertility, GreenPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.tauxFertilite}%", strings.kpiFertility, BrandPrimary, Modifier.weight(1f))
                         MiniKpiBox("${stats.totalMisesBas}", strings.kpiLitters, BlueGestante, Modifier.weight(1f))
-                        MiniKpiBox(stats.moyennePortee, strings.kpiAlivePerLitter, GreenPrimary, Modifier.weight(1f))
-                        MiniKpiBox("${stats.totalSevres}", strings.kpiWeaned, GreenPrimary, Modifier.weight(1f))
+                        MiniKpiBox(stats.moyennePortee, strings.kpiAlivePerLitter, BrandPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.totalSevres}", strings.kpiWeaned, BrandPrimary, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -816,7 +901,7 @@ fun FemelleDetailView(
                             strings.weaningSurvivalRate(stats.tauxSevrage),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GreenPrimary
+                            color = BrandPrimary
                         )
                     }
                 }
@@ -828,8 +913,9 @@ fun FemelleDetailView(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(24.dp),
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -871,7 +957,7 @@ fun FemelleDetailView(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
                                             color = when (c.statut) {
-                                                "termine" -> GreenPrimary
+                                                "termine" -> BrandPrimary
                                                 "echec" -> RedCritical
                                                 else -> BlueGestante
                                             }
@@ -890,7 +976,7 @@ fun FemelleDetailView(
                                         Text(
                                             strings.cycleWeanedLine(c.nombreSevres, survie),
                                             fontSize = 12.5.sp,
-                                            color = GreenPrimary,
+                                            color = BrandPrimary,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     }
@@ -922,8 +1008,9 @@ fun FemelleDetailView(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(24.dp),
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -938,7 +1025,7 @@ fun FemelleDetailView(
                         )
                         Button(
                             onClick = { showVaccinDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                         ) {
                             Text(strings.vaccinateBtn)
                         }
@@ -984,7 +1071,7 @@ fun FemelleDetailView(
         var dateVac by remember { mutableStateOf(DateHelper.todayIso()) }
 
         Dialog(onDismissRequest = { showVaccinDialog = false }) {
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(strings.dialogRecordVaccinationTitle, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(modifier = Modifier.height(10.dp))
@@ -1019,7 +1106,7 @@ fun FemelleDetailView(
                                 showVaccinDialog = false
                                 onVaccinationAdded()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                         ) {
                             Text(strings.save)
                         }
@@ -1059,7 +1146,9 @@ fun ElevageStocksTab(
     onAddClapet: (String) -> Unit,
     onDeleteClapet: (Long) -> Unit,
     onSaveAliment: (Long?, String, Double, Double) -> Unit,
-    onDeleteAliment: (Long) -> Unit
+    onDeleteAliment: (Long) -> Unit,
+    section: String = "all", // "all", "feed", "cages"
+    extraContent: LazyListScope.() -> Unit = {}
 ) {
     val strings = LocalAppStrings.current
     var newClapetNum by remember { mutableStateOf("") }
@@ -1071,7 +1160,7 @@ fun ElevageStocksTab(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 48.dp)
     ) {
         // Section Aliments
-        item {
+        if (section != "cages") item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1083,7 +1172,7 @@ fun ElevageStocksTab(
                         editingAliment = null
                         showAlimDialog = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                 ) {
                     Text(strings.btnAddFeed)
                 }
@@ -1091,7 +1180,7 @@ fun ElevageStocksTab(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        items(aliments, key = { "alim_${it.id}" }) { alim ->
+        if (section != "cages") items(aliments, key = { "alim_${it.id}" }) { alim ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1100,7 +1189,8 @@ fun ElevageStocksTab(
                         editingAliment = alim
                         showAlimDialog = true
                     },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Row(
                     modifier = Modifier
@@ -1120,7 +1210,7 @@ fun ElevageStocksTab(
                             strings.feedAutonomyRow(alim.joursRestants),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (alim.joursRestants <= 7) RedCritical else GreenPrimary
+                            color = if (alim.joursRestants <= 7) RedCritical else BrandPrimary
                         )
                     }
                     IconButton(onClick = { onDeleteAliment(alim.id) }) {
@@ -1130,9 +1220,11 @@ fun ElevageStocksTab(
             }
         }
 
+        if (section == "feed") extraContent()
+
         // Section Clapets
-        item {
-            Spacer(modifier = Modifier.height(20.dp))
+        if (section != "feed") item {
+            if (section == "all") Spacer(modifier = Modifier.height(20.dp))
             Text(strings.cagesManagementHeader(clapets.size), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -1154,7 +1246,7 @@ fun ElevageStocksTab(
                             newClapetNum = ""
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                 ) {
                     Text(strings.btnAdd)
                 }
@@ -1162,12 +1254,13 @@ fun ElevageStocksTab(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        items(clapets, key = { "clapet_${it.id}" }) { c ->
+        if (section != "feed") items(clapets, key = { "clapet_${it.id}" }) { c ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Row(
                     modifier = Modifier
@@ -1181,7 +1274,7 @@ fun ElevageStocksTab(
                         Text(
                             text = c.occupanteNumero?.let { strings.cageOccupiedBy(it) } ?: strings.cageEmpty,
                             fontSize = 13.sp,
-                            color = if (c.occupanteNumero != null) GreenPrimary else Color.Gray
+                            color = if (c.occupanteNumero != null) BrandPrimary else Color.Gray
                         )
                     }
                     IconButton(onClick = { onDeleteClapet(c.id) }) {
@@ -1198,7 +1291,7 @@ fun ElevageStocksTab(
         var conso by remember(editingAliment) { mutableStateOf(editingAliment?.consommationG?.toInt()?.toString() ?: "150") }
 
         Dialog(onDismissRequest = { showAlimDialog = false }) {
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         if (editingAliment == null) strings.dialogAddFeedTitle else strings.dialogEditFeedTitle,
@@ -1246,7 +1339,7 @@ fun ElevageStocksTab(
                                     showAlimDialog = false
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                         ) {
                             Text(strings.save)
                         }
@@ -1263,7 +1356,9 @@ fun VaccinsTab(
     vaccineAlerts: List<VaccinationFemelle>,
     onAddVaccin: (String, Int) -> Unit,
     onDeleteVaccin: (Long) -> Unit,
-    onOpenFemelle: (Long) -> Unit
+    onOpenFemelle: (Long) -> Unit,
+    herdStatus: Map<Long, Pair<String, String>> = emptyMap(),
+    onVaccinateAll: (Vaccin) -> Unit = {}
 ) {
     val strings = LocalAppStrings.current
     var nom by remember { mutableStateOf("") }
@@ -1304,7 +1399,7 @@ fun VaccinsTab(
                             nom = ""
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                 ) {
                     Text("+")
                 }
@@ -1317,7 +1412,8 @@ fun VaccinsTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                colors = glassCardColors(),
+                border = glassBorder()
             ) {
                 Row(
                     modifier = Modifier
@@ -1326,9 +1422,32 @@ fun VaccinsTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(v.nom, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(strings.vaccineReminderInterval(v.dureeJours), fontSize = 13.sp, color = Color.Gray)
+                        val st = herdStatus[v.id]
+                        if (st != null) {
+                            Text(
+                                strings.menu.lastVaccination(DateHelper.formatFr(st.first)),
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                strings.menu.nextVaccination(DateHelper.formatFr(st.second)),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if ((DateHelper.daysUntil(st.second) ?: 99) <= 7) RedCritical else MintNursing
+                            )
+                        } else {
+                            Text(
+                                strings.menu.neverVaccinated,
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = { onVaccinateAll(v) }) {
+                        Icon(Icons.Default.Vaccines, contentDescription = strings.menu.vaccinateAll, tint = BrandPrimary)
                     }
                     IconButton(onClick = { onDeleteVaccin(v.id) }) {
                         Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
@@ -1409,7 +1528,7 @@ fun AddEditFemelleDialog(
                             }
                         },
                         enabled = numero.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                     ) {
                         Text(strings.save)
                     }
@@ -1429,9 +1548,10 @@ fun SummaryStatCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(24.dp),
+        colors = glassCardColors(),
+                border = glassBorder(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(title, fontSize = 13.sp, color = Color.Gray)

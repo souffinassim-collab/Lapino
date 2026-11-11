@@ -11,11 +11,11 @@ Ces valeurs sont des repères usuels ; l'utilisateur (éleveur) a le dernier mot
 | Étape | Repère | Dans Lapino |
 |---|---|---|
 | Saillie | J0 ; lapine présentée au mâle (dans la cage du mâle) | `startCycle`, statut `saillie` |
-| Palpation | J10–J14 (ampoules fœtales) ; négatif → représenter au mâle | prévue J+11, alerte dès J10 → `verifyGestation` |
+| Palpation | J10–J14 (ampoules fœtales) ; négatif → représenter au mâle | prévue J+10, alerte dès J10 → `verifyGestation` |
 | Boîte à nid | J27–J28, paille/copeaux propres | prévue J+28, alerte dès J27 → `confirmNestBox` |
 | Mise bas | gestation 30–32 j (moy. 31) ; > J33 = anormal | prévue J+31, alerte à ≤ 2 j → `confirmBirth`, statut `allaitante` |
 | Contrôle du nid | J+1 après mise bas : retirer les morts, égaliser les portées (adoption 8–10/lapine) | — (idée de fonctionnalité) |
-| Sevrage | 28–35 j après mise bas (Lapino : prévu +35, alerte dès +30) | `confirmWeaning`, statut `termine` |
+| Sevrage | 28–35 j après mise bas (Lapino : dates J+28 et J+35 affichées, alerte dès +28) | `confirmWeaning`, statut `termine` |
 | Rythmes | intensif : re-saillie J+11 post-partum (cycle 42 j) ; semi-intensif : J+18–25 ; extensif : après sevrage | — |
 | Mise à la reproduction | femelle ~4,5–5 mois (≈ 3,5–4 kg selon souche), mâle ~5–6 mois | `calculateAgeLabel` |
 | Réforme | ~8–12 portées, ou 3 échecs de palpation consécutifs, mammites, maigreur | — |
