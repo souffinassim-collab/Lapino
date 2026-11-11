@@ -112,10 +112,10 @@ fun CycleDatesBlock(femelle: Femelle, modifier: Modifier = Modifier) {
             val d = DateHelper.daysUntil(s.iso) ?: 0
             val (state, stateColor) = when {
                 s.done -> "✓ ${ms.done}" to MaterialTheme.colorScheme.onSurfaceVariant
-                d == 0 -> ms.today to RedCritical
+                d == 0 -> ms.today to redTextColor()
                 d > 0 -> ms.inDays(d) to MaterialTheme.colorScheme.onSurfaceVariant
-                s.optional -> ms.possibleNow to MintNursing
-                else -> ms.lateDays(abs(d)) to RedCritical
+                s.optional -> ms.possibleNow to mintTextColor()
+                else -> ms.lateDays(abs(d)) to redTextColor()
             }
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.done) s.color.copy(alpha = 0.4f) else s.color))
@@ -314,15 +314,15 @@ fun MalesScreen(
                             ms.maleStats(m.totalSaillies, m.totalMisesBas),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = BlueGestante
+                            color = blueTextColor()
                         )
                     }
                     IconButton(onClick = {
                         editing = m
                         showDialog = true
-                    }) { Icon(Icons.Default.Edit, contentDescription = strings.edit) }
+                    }) { Icon(Icons.Default.Edit, contentDescription = strings.edit, tint = MaterialTheme.colorScheme.onSurface) }
                     IconButton(onClick = { onDelete(m.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
                     }
                 }
             }
@@ -402,8 +402,8 @@ fun LittersScreen(
                     LinearProgressIndicator(
                         progress = target,
                         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)),
-                        color = MintNursing,
-                        trackColor = MintNursing.copy(alpha = 0.18f)
+                        color = mintTextColor(),
+                        trackColor = mintTextColor().copy(alpha = 0.22f)
                     )
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -412,15 +412,16 @@ fun LittersScreen(
                                 " → ${DateHelper.formatFr(DateHelper.addDays(birth, CycleRules.WEAN_LATE_DAYS))}",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f)
                         )
                         Button(
                             onClick = { onWean(f) },
                             enabled = day >= 21,
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MintNursing),
+                            colors = ButtonDefaults.buttonColors(containerColor = MintNursing, contentColor = Color.White),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                        ) { Text(strings.actionWean, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        ) { Text(strings.actionWean, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White) }
                     }
                 }
             }
@@ -486,10 +487,10 @@ fun SalesScreen(
                         "${fmtNum(v.total)} ${ms.currency}",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 16.sp,
-                        color = MintNursing
+                        color = mintTextColor()
                     )
                     IconButton(onClick = { onDelete(v.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
                     }
                 }
             }
@@ -517,7 +518,7 @@ fun SalesScreen(
             Text(
                 "= ${fmtNum((nombre.toIntOrNull() ?: 0) * prix.toDoubleSafe())} ${ms.currency}",
                 fontWeight = FontWeight.Bold,
-                color = MintNursing
+                color = mintTextColor()
             )
         }
     }
@@ -588,7 +589,7 @@ fun FeedPurchaseRow(index: Int, achat: AchatAliment, onDelete: () -> Unit) {
                 }
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
             }
         }
     }
@@ -647,7 +648,7 @@ fun VaccinateAllDialog(vaccin: Vaccin, femellesCount: Int, onDismiss: () -> Unit
             ms.nextVaccination(DateHelper.formatFr(DateHelper.addDays(date, vaccin.dureeJours))),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            color = BrandPrimary
+            color = brandTextColor()
         )
     }
 }

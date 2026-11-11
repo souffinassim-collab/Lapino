@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,7 +79,9 @@ fun AuroraBackground(modifier: Modifier = Modifier, content: @Composable () -> U
             halo(Color(0xFF22D3EE), w * (0.15f + 0.3f * drift), h * (0.78f - 0.1f * drift), w * 0.8f)
             halo(Color(0xFF6366F1), w * 0.9f, h * (0.95f - 0.1f * drift), w * 0.6f)
         }
-        content()
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+            content()
+        }
     }
 }
 
@@ -127,7 +131,11 @@ fun GlassCard(
         .clip(shape)
         .background(glassBrush())
         .border(1.dp, glassBorderBrush(), shape)
-    Box(modifier = base) { content() }
+    Box(modifier = base) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            content()
+        }
+    }
 }
 
 /** Clic avec effet de pression élastique (léger rétrécissement). */

@@ -167,10 +167,11 @@ fun LapinoApp(
     AuroraBackground {
         Scaffold(
             containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             topBar = {
                 if (target != "home") {
                     TopAppBar(
-                        title = { Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp) },
+                        title = { Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp, color = MaterialTheme.colorScheme.onBackground) },
                         navigationIcon = {
                             Box(modifier = Modifier.padding(start = 12.dp, end = 10.dp)) {
                                 GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, strings.back, onClick = goBack)
@@ -178,7 +179,9 @@ fun LapinoApp(
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent,
-                            scrolledContainerColor = Color.Transparent
+                            scrolledContainerColor = Color.Transparent,
+                            titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                         )
                     )
                 }
@@ -483,7 +486,7 @@ fun DashboardTab(
                     title = strings.statActiveRabbits,
                     value = stats.totalFemelles.toString(),
                     subtitle = strings.statOccupiedCages(stats.clapetsRemplis, stats.clapetsTotal),
-                    color = BrandPrimary,
+                    color = brandTextColor(),
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
@@ -491,7 +494,7 @@ fun DashboardTab(
                     title = strings.statKitsInNest,
                     value = stats.lapereauxSousMere.toString(),
                     subtitle = strings.statNursingMothers(stats.allaitantes),
-                    color = BlueGestante,
+                    color = blueTextColor(),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -519,7 +522,7 @@ fun DashboardTab(
                     text = strings.sectionPriorityActions(reproAlerts.size),
                     fontSize = 16.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangeAlert,
+                    color = orangeTextColor(),
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
@@ -587,7 +590,7 @@ fun DashboardTab(
                     text = strings.sectionLowFeedStock(alimentsBas.size),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = RedCritical,
+                    color = redTextColor(),
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
@@ -632,7 +635,7 @@ fun DashboardTab(
                     text = strings.sectionVaccineReminders(vaccineAlerts.size),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OrangeAlert,
+                    color = orangeTextColor(),
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }
@@ -823,7 +826,7 @@ fun FemelleDetailView(
                             Text(
                                 text = "🏠 " + (femelle.clapetNumero?.let { strings.cageAssigned(it) } ?: strings.cageUnassigned),
                                 fontSize = 14.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         OutlinedButton(onClick = onEditFemelle) {
@@ -882,10 +885,10 @@ fun FemelleDetailView(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        MiniKpiBox("${stats.tauxFertilite}%", strings.kpiFertility, BrandPrimary, Modifier.weight(1f))
-                        MiniKpiBox("${stats.totalMisesBas}", strings.kpiLitters, BlueGestante, Modifier.weight(1f))
-                        MiniKpiBox(stats.moyennePortee, strings.kpiAlivePerLitter, BrandPrimary, Modifier.weight(1f))
-                        MiniKpiBox("${stats.totalSevres}", strings.kpiWeaned, BrandPrimary, Modifier.weight(1f))
+                        MiniKpiBox("${stats.tauxFertilite}%", strings.kpiFertility, brandTextColor(), Modifier.weight(1f))
+                        MiniKpiBox("${stats.totalMisesBas}", strings.kpiLitters, blueTextColor(), Modifier.weight(1f))
+                        MiniKpiBox(stats.moyennePortee, strings.kpiAlivePerLitter, brandTextColor(), Modifier.weight(1f))
+                        MiniKpiBox("${stats.totalSevres}", strings.kpiWeaned, brandTextColor(), Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
@@ -895,13 +898,13 @@ fun FemelleDetailView(
                         Text(
                             strings.bornSummary(stats.totalVivants, stats.totalMorts),
                             fontSize = 12.5.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             strings.weaningSurvivalRate(stats.tauxSevrage),
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = BrandPrimary
+                            color = brandTextColor()
                         )
                     }
                 }
@@ -925,7 +928,7 @@ fun FemelleDetailView(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     if (history.isEmpty()) {
-                        Text(strings.noCyclesRecorded, fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.noCyclesRecorded, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         history.forEach { c ->
                             Surface(
@@ -957,9 +960,9 @@ fun FemelleDetailView(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
                                             color = when (c.statut) {
-                                                "termine" -> BrandPrimary
-                                                "echec" -> RedCritical
-                                                else -> BlueGestante
+                                                "termine" -> brandTextColor()
+                                                "echec" -> redTextColor()
+                                                else -> blueTextColor()
                                             }
                                         )
                                     }
@@ -976,7 +979,7 @@ fun FemelleDetailView(
                                         Text(
                                             strings.cycleWeanedLine(c.nombreSevres, survie),
                                             fontSize = 12.5.sp,
-                                            color = BrandPrimary,
+                                            color = brandTextColor(),
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     }
@@ -984,7 +987,7 @@ fun FemelleDetailView(
                                         Text(
                                             strings.cycleReason(c.motifEchec),
                                             fontSize = 12.sp,
-                                            color = RedCritical
+                                            color = redTextColor()
                                         )
                                     }
                                     if (!c.notes.isNullOrBlank()) {
@@ -992,7 +995,7 @@ fun FemelleDetailView(
                                             strings.cycleNotes(c.notes),
                                             fontSize = 12.sp,
                                             fontStyle = FontStyle.Italic,
-                                            color = Color.Gray
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -1025,14 +1028,14 @@ fun FemelleDetailView(
                         )
                         Button(
                             onClick = { showVaccinDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                         ) {
-                            Text(strings.vaccinateBtn)
+                            Text(strings.vaccinateBtn, color = Color.White)
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     if (vaccinations.isEmpty()) {
-                        Text(strings.noVaccinationsRecorded, fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.noVaccinationsRecorded, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         vaccinations.forEach { v ->
                             Row(
@@ -1045,7 +1048,7 @@ fun FemelleDetailView(
                                 Text(
                                     strings.vaccinationLine(DateHelper.formatFr(v.dateVaccination), DateHelper.formatFr(v.dateProchain)),
                                     fontSize = 12.sp,
-                                    color = Color.Gray
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -1056,7 +1059,7 @@ fun FemelleDetailView(
 
             OutlinedButton(
                 onClick = { showDeleteConfirm = true },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = RedCritical),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = redTextColor()),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Delete, contentDescription = null)
@@ -1106,9 +1109,9 @@ fun FemelleDetailView(
                                 showVaccinDialog = false
                                 onVaccinationAdded()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                         ) {
-                            Text(strings.save)
+                            Text(strings.save, color = Color.White)
                         }
                     }
                 }
@@ -1127,9 +1130,9 @@ fun FemelleDetailView(
                         showDeleteConfirm = false
                         onDeleteFemelle()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = RedCritical)
+                    colors = ButtonDefaults.buttonColors(containerColor = RedCritical, contentColor = Color.White)
                 ) {
-                    Text(strings.confirmDelete)
+                    Text(strings.confirmDelete, color = Color.White)
                 }
             },
             dismissButton = {
@@ -1172,9 +1175,9 @@ fun ElevageStocksTab(
                         editingAliment = null
                         showAlimDialog = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                 ) {
-                    Text(strings.btnAddFeed)
+                    Text(strings.btnAddFeed, color = Color.White)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1204,17 +1207,17 @@ fun ElevageStocksTab(
                         Text(
                             strings.feedStockRow(alim.stockKg, alim.consommationG.toInt()),
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             strings.feedAutonomyRow(alim.joursRestants),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (alim.joursRestants <= 7) RedCritical else BrandPrimary
+                            color = if (alim.joursRestants <= 7) redTextColor() else brandTextColor()
                         )
                     }
                     IconButton(onClick = { onDeleteAliment(alim.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
                     }
                 }
             }
@@ -1246,9 +1249,9 @@ fun ElevageStocksTab(
                             newClapetNum = ""
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                 ) {
-                    Text(strings.btnAdd)
+                    Text(strings.btnAdd, color = Color.White)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -1274,11 +1277,11 @@ fun ElevageStocksTab(
                         Text(
                             text = c.occupanteNumero?.let { strings.cageOccupiedBy(it) } ?: strings.cageEmpty,
                             fontSize = 13.sp,
-                            color = if (c.occupanteNumero != null) BrandPrimary else Color.Gray
+                            color = if (c.occupanteNumero != null) brandTextColor() else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = { onDeleteClapet(c.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
                     }
                 }
             }
@@ -1339,9 +1342,9 @@ fun ElevageStocksTab(
                                     showAlimDialog = false
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                         ) {
-                            Text(strings.save)
+                            Text(strings.save, color = Color.White)
                         }
                     }
                 }
@@ -1399,9 +1402,9 @@ fun VaccinsTab(
                             nom = ""
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                 ) {
-                    Text("+")
+                    Text("+", color = Color.White)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -1424,7 +1427,7 @@ fun VaccinsTab(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(v.nom, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(strings.vaccineReminderInterval(v.dureeJours), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.vaccineReminderInterval(v.dureeJours), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         val st = herdStatus[v.id]
                         if (st != null) {
                             Text(
@@ -1436,7 +1439,7 @@ fun VaccinsTab(
                                 strings.menu.nextVaccination(DateHelper.formatFr(st.second)),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if ((DateHelper.daysUntil(st.second) ?: 99) <= 7) RedCritical else MintNursing
+                                color = if ((DateHelper.daysUntil(st.second) ?: 99) <= 7) redTextColor() else mintTextColor()
                             )
                         } else {
                             Text(
@@ -1447,10 +1450,10 @@ fun VaccinsTab(
                         }
                     }
                     IconButton(onClick = { onVaccinateAll(v) }) {
-                        Icon(Icons.Default.Vaccines, contentDescription = strings.menu.vaccinateAll, tint = BrandPrimary)
+                        Icon(Icons.Default.Vaccines, contentDescription = strings.menu.vaccinateAll, tint = brandTextColor())
                     }
                     IconButton(onClick = { onDeleteVaccin(v.id) }) {
-                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = RedCritical)
+                        Icon(Icons.Default.Delete, contentDescription = strings.confirmDelete, tint = redTextColor())
                     }
                 }
             }
@@ -1528,9 +1531,9 @@ fun AddEditFemelleDialog(
                             }
                         },
                         enabled = numero.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White)
                     ) {
-                        Text(strings.save)
+                        Text(strings.save, color = Color.White)
                     }
                 }
             }
@@ -1554,9 +1557,9 @@ fun SummaryStatCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(title, fontSize = 13.sp, color = Color.Gray)
+            Text(title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = color)
-            Text(subtitle, fontSize = 11.5.sp, color = Color.Gray)
+            Text(subtitle, fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1582,7 +1585,7 @@ fun InfoRow(label: String, value: String) {
             .padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, fontSize = 13.5.sp, color = Color.Gray)
+        Text(label, fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
     }
 }
@@ -1592,12 +1595,12 @@ fun MiniKpiBox(value: String, label: String, color: Color, modifier: Modifier = 
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(color.copy(alpha = 0.1f))
+            .background(color.copy(alpha = 0.14f))
             .padding(vertical = 8.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(value, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = color)
-        Text(label, fontSize = 10.sp, color = Color.Gray, textAlign = TextAlign.Center)
+        Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 

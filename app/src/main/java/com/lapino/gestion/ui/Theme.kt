@@ -19,7 +19,7 @@ val BrandPrimary = Color(0xFF5B4FE9)
 val BrandLight = Color(0xFF8B7CF6)
 val BrandContainer = Color(0xFFECEAFE)
 
-// Couleurs par phase du cycle
+// Couleurs par phase du cycle (sur fond clair / pastilles pastel)
 val PinkSaillie = Color(0xFFDB2777)
 val PinkContainer = Color(0xFFFCE7F3)
 val BlueGestante = Color(0xFF0369A1)
@@ -30,6 +30,13 @@ val OrangeAlert = Color(0xFFB45309)
 val OrangeContainer = Color(0xFFFEF3C7)
 val RedCritical = Color(0xFFDC2626)
 val RedContainer = Color(0xFFFEE2E2)
+
+// Couleurs de texte adaptatives (lisibles sur fond sombre comme sur fond clair)
+@Composable fun brandTextColor(): Color = if (isDarkTheme()) Color(0xFFA5A0FF) else BrandPrimary
+@Composable fun blueTextColor(): Color = if (isDarkTheme()) Color(0xFF38BDF8) else BlueGestante
+@Composable fun mintTextColor(): Color = if (isDarkTheme()) Color(0xFF34D399) else MintNursing
+@Composable fun orangeTextColor(): Color = if (isDarkTheme()) Color(0xFFFBBF24) else OrangeAlert
+@Composable fun redTextColor(): Color = if (isDarkTheme()) Color(0xFFF87171) else RedCritical
 
 val HeroGradient = Brush.linearGradient(
     listOf(Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFA855F7))
@@ -57,23 +64,23 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA5A0FF),
-    onPrimary = Color(0xFF16124A),
+    primary = Color(0xFF7C72FF),
+    onPrimary = Color.White,
     primaryContainer = Color(0xFF322C8A),
     onPrimaryContainer = Color(0xFFE4E1FF),
-    secondary = Color(0xFFC4B5FD),
-    onSecondary = Color(0xFF2E1065),
+    secondary = Color(0xFF9370DB),
+    onSecondary = Color.White,
     secondaryContainer = Color(0xFF3B2A7A),
     onSecondaryContainer = Color(0xFFEDE9FE),
     tertiary = Color(0xFF6EE7B7),
     background = Color(0xFF0D0E14),
-    onBackground = Color(0xFFECEDF5),
-    surface = Color(0xFF181A23),
-    onSurface = Color(0xFFECEDF5),
-    surfaceVariant = Color(0xFF232632),
-    onSurfaceVariant = Color(0xFFA9ADC0),
-    outline = Color(0xFF4A4E60),
-    outlineVariant = Color(0xFF2C2F3D),
+    onBackground = Color(0xFFF3F4FA),
+    surface = Color(0xFF181A24),
+    onSurface = Color(0xFFF3F4FA),
+    surfaceVariant = Color(0xFF252836),
+    onSurfaceVariant = Color(0xFFBDC1D6),
+    outline = Color(0xFF555A70),
+    outlineVariant = Color(0xFF2F3344),
     error = Color(0xFFFCA5A5)
 )
 

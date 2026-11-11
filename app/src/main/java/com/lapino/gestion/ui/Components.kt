@@ -212,11 +212,11 @@ fun RabbitStatusCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Button(
                             onClick = { onAction(femelle, "nest") },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
-                            Text(strings.actionNestPlaced, fontSize = 11.sp)
+                            Text(strings.actionNestPlaced, fontSize = 11.sp, color = Color.White)
                         }
                     }
                 }
@@ -243,11 +243,11 @@ fun RabbitStatusCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Button(
                         onClick = { onAction(femelle, "wean") },
-                        colors = ButtonDefaults.buttonColors(containerColor = MintNursing),
+                        colors = ButtonDefaults.buttonColors(containerColor = MintNursing, contentColor = Color.White),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Text(strings.menu.actionWeanLitter, fontSize = 11.sp)
+                        Text(strings.menu.actionWeanLitter, fontSize = 11.sp, color = Color.White)
                     }
                 }
             }
@@ -286,7 +286,7 @@ fun RabbitStatusCard(
                         Icon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = strings.incidentDescription,
-                            tint = RedCritical
+                            tint = redTextColor()
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -295,11 +295,12 @@ fun RabbitStatusCard(
                 Button(
                     onClick = { onAction(femelle, actionType) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (cycle == null) BrandPrimary else statusColor
+                        containerColor = if (cycle == null) BrandPrimary else statusColor,
+                        contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text(actionLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(actionLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                 }
             }
         }
@@ -347,7 +348,7 @@ fun ReproductionDialog(
                 when (actionType) {
                     "start" -> {
                         Text(strings.dialogMatingTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.matingTip)
                         MatingChecks(femelle)
@@ -378,16 +379,16 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = { onStartCycle(dateInput, maleInput, notesInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = PinkSaillie),
+                            colors = ButtonDefaults.buttonColors(containerColor = PinkSaillie, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnValidateMating, fontWeight = FontWeight.Bold)
+                            Text(strings.btnValidateMating, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
                     "verify" -> {
                         Text(strings.dialogPalpationTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.palpationTip)
                         OutlinedTextField(
@@ -407,39 +408,39 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = { onVerifyGestation(dateInput, true, notesInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnPregnantYes, fontWeight = FontWeight.Bold)
+                            Text(strings.btnPregnantYes, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = { onVerifyGestation(dateInput, false, notesInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = RedCritical),
+                            colors = ButtonDefaults.buttonColors(containerColor = RedCritical, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnPregnantNo, fontWeight = FontWeight.Bold)
+                            Text(strings.btnPregnantNo, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
                     "nest" -> {
                         Text(strings.dialogNestTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.nestTip)
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = onConfirmNestBox,
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnConfirmNest, fontWeight = FontWeight.Bold)
+                            Text(strings.btnConfirmNest, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
                     "birth" -> {
                         Text(strings.dialogBirthTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.birthTip)
                         OutlinedTextField(
@@ -484,16 +485,16 @@ fun ReproductionDialog(
                                 onConfirmBirth(dateInput, v, m, notesInput)
                             },
                             enabled = vivantsInput.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnSaveBirth, fontWeight = FontWeight.Bold)
+                            Text(strings.btnSaveBirth, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
                     "wean" -> {
                         Text(strings.dialogWeaningTitle, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.weaningTip)
                         OutlinedTextField(
@@ -519,7 +520,7 @@ fun ReproductionDialog(
                             Text(
                                 text = strings.nestSurvivalRate(sevresCount, nesVivants, pct),
                                 fontSize = 12.5.sp,
-                                color = BrandPrimary,
+                                color = brandTextColor(),
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
@@ -538,10 +539,10 @@ fun ReproductionDialog(
                                 onConfirmWeaning(dateInput, s, notesInput)
                             },
                             enabled = sevresInput.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnCloseCycleSuccess, fontWeight = FontWeight.Bold)
+                            Text(strings.btnCloseCycleSuccess, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
@@ -550,9 +551,9 @@ fun ReproductionDialog(
                             strings.dialogIncidentTitle,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
-                            color = RedCritical
+                            color = redTextColor()
                         )
-                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val motifs = listOf(
@@ -588,10 +589,10 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(14.dp))
                         Button(
                             onClick = { onStopCycle(motifFail, notesInput) },
-                            colors = ButtonDefaults.buttonColors(containerColor = RedCritical),
+                            colors = ButtonDefaults.buttonColors(containerColor = RedCritical, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(strings.btnConfirmStopCycle, fontWeight = FontWeight.Bold)
+                            Text(strings.btnConfirmStopCycle, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }
