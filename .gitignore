@@ -10,9 +10,10 @@ local.properties
 *.apk
 *.aab
 
-# Clés de signature
+# Clés de signature & outil privé de licence
 *.jks
 *.keystore
+license-admin/
 
 # Cache local graft
 /graft/

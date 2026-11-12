@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.lapino.gestion.data.LapinoDatabase
 import com.lapino.gestion.i18n.*
+import com.lapino.gestion.license.*
 import com.lapino.gestion.model.*
 import com.lapino.gestion.ui.*
 import java.util.Locale
@@ -114,10 +115,13 @@ fun LapinoApp(
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var farmName by remember { mutableStateOf(AppPrefs.farmName(context)) }
     var showSettings by remember { mutableStateOf(false) }
+    var showLicenseDialog by remember { mutableStateOf(false) }
+    var licenseLimitReached by remember { mutableStateOf(false) }
     var vaccinateAllTarget by remember { mutableStateOf<Vaccin?>(null) }
     var showPurchaseDialog by remember { mutableStateOf(false) }
 
-    // États chargés depuis SQLite
+    // États chargés depuis SQLite + Licence
+    val licenseStatus = remember(refreshTrigger) { LicenseManager.getStatus(context) }
     val globalStats = remember(refreshTrigger) { db.getGlobalStats() }
     val femelles = remember(refreshTrigger) { db.getFemellesWithStatus() }
     val reproAlerts = remember(refreshTrigger) { db.getReproductionAlerts() }
@@ -140,6 +144,15 @@ fun LapinoApp(
     var editingFemelle by remember { mutableStateOf<Femelle?>(null) }
 
     val triggerReload: () -> Unit = { refreshTrigger += 1 }
+    val openNewFemale: () -> Unit = {
+        if (!licenseStatus.isLicensed && femelles.size >= LicenseManager.FREE_MAX_FEMALES) {
+            licenseLimitReached = true
+            showLicenseDialog = true
+        } else {
+            editingFemelle = null
+            showAddEditFemelle = true
+        }
+    }
     val openCycleAction: (Femelle, String) -> Unit = { f, action ->
         activeReproFemelle = f
         activeReproAction = action
@@ -190,10 +203,7 @@ fun LapinoApp(
             floatingActionButton = {
                 if (target == "femelles") {
                     ExtendedFloatingActionButton(
-                        onClick = {
-                            editingFemelle = null
-                            showAddEditFemelle = true
-                        },
+                        onClick = openNewFemale,
                         containerColor = BrandPrimary,
                         contentColor = Color.White,
                         shape = RoundedCornerShape(20.dp),
@@ -359,10 +369,7 @@ fun LapinoApp(
                         },
                         onQuickAction = { action ->
                             when (action) {
-                                "new_female" -> {
-                                    editingFemelle = null
-                                    showAddEditFemelle = true
-                                }
+                                "new_female" -> openNewFemale()
                                 "new_sale" -> screen = "sales"
                                 "new_purchase" -> showPurchaseDialog = true
                             }
@@ -375,10 +382,25 @@ fun LapinoApp(
     }
 
     if (showSettings) {
+        val licSummary = when {
+            licenseStatus.type == LicenseType.LIFE -> ms.licenseLifeStatus
+            licenseStatus.type == LicenseType.YEAR && !licenseStatus.isExpired ->
+                ms.licenseYearStatus(DateHelper.formatFr(licenseStatus.expiryIso))
+            licenseStatus.type == LicenseType.YEAR && licenseStatus.isExpired ->
+                ms.licenseExpiredStatus(DateHelper.formatFr(licenseStatus.expiryIso))
+            else -> ms.licenseFreeStatus
+        }
         SettingsDialog(
             farmName = farmName,
             isDark = isDark,
             currentLang = currentLang,
+            licenseSummary = licSummary,
+            isLicensed = licenseStatus.isLicensed,
+            onOpenLicense = {
+                showSettings = false
+                licenseLimitReached = false
+                showLicenseDialog = true
+            },
             onFarmNameChange = {
                 farmName = it
                 AppPrefs.setFarmName(context, it)
@@ -387,6 +409,18 @@ fun LapinoApp(
             onLanguageChanged = onLanguageChanged,
             onRulesChanged = triggerReload,
             onDismiss = { showSettings = false }
+        )
+    }
+
+    if (showLicenseDialog) {
+        LicenseDialog(
+            status = licenseStatus,
+            limitReached = licenseLimitReached,
+            onActivated = {
+                triggerReload()
+                showLicenseDialog = false
+            },
+            onDismiss = { showLicenseDialog = false }
         )
     }
 

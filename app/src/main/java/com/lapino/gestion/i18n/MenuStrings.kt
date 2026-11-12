@@ -128,6 +128,27 @@ interface MenuStrings {
     val btnMinusDay: String
     val btnToday: String
     val btnPlusDay: String
+
+    // Licence
+    val licenseTitle: String
+    val licenseFreeStatus: String
+    val licenseLifeStatus: String
+    fun licenseYearStatus(date: String): String
+    fun licenseExpiredStatus(date: String): String
+    fun licenseFreeLimitInfo(max: Int): String
+    val licenseDeviceCode: String
+    val licenseCopy: String
+    val licenseCopied: String
+    val licenseOrderWhatsApp: String
+    val licenseKeyLabel: String
+    val licensePaste: String
+    val licenseActivate: String
+    val licenseManage: String
+    val licenseSuccess: String
+    val licenseErrFormat: String
+    val licenseErrSignature: String
+    val licenseErrDevice: String
+    val licenseErrExpired: String
 }
 
 val AppStrings.menu: MenuStrings
@@ -271,6 +292,27 @@ object MenuStringsFR : MenuStrings {
     override val btnMinusDay = "-1j"
     override val btnToday = "Aujourd'hui"
     override val btnPlusDay = "+1j"
+
+    override val licenseTitle = "Licence Lapino"
+    override val licenseFreeStatus = "Mode Découverte (max 5 lapines)"
+    override val licenseLifeStatus = "✅ Licence À vie active"
+    override fun licenseYearStatus(date: String) = "✅ Licence active jusqu'au $date"
+    override fun licenseExpiredStatus(date: String) = "⚠️ Licence expirée le $date"
+    override fun licenseFreeLimitInfo(max: Int) =
+        "La version gratuite est limitée à $max lapines. Activez votre licence pour gérer un élevage illimité (vos données restent conservées)."
+    override val licenseDeviceCode = "Votre Code Appareil"
+    override val licenseCopy = "Copier"
+    override val licenseCopied = "Code copié !"
+    override val licenseOrderWhatsApp = "Commander sur WhatsApp (0770 20 86 26)"
+    override val licenseKeyLabel = "Clé d'activation (LPN1...)"
+    override val licensePaste = "Coller"
+    override val licenseActivate = "Activer"
+    override val licenseManage = "Gérer la licence"
+    override val licenseSuccess = "✅ Licence activée avec succès ! Élevage illimité débloqué."
+    override val licenseErrFormat = "Format de clé invalide."
+    override val licenseErrSignature = "Clé non reconnue ou corrompue."
+    override val licenseErrDevice = "Cette clé appartient à un autre appareil."
+    override val licenseErrExpired = "Cette clé de licence est expirée."
 }
 
 object MenuStringsAR : MenuStrings {
@@ -407,4 +449,25 @@ object MenuStringsAR : MenuStrings {
     override val btnMinusDay = "-1 يوم"
     override val btnToday = "اليوم"
     override val btnPlusDay = "+1 يوم"
+
+    override val licenseTitle = "رخصة Lapino"
+    override val licenseFreeStatus = "الوضع التجريبي (حد أقصى 5 أرانب)"
+    override val licenseLifeStatus = "✅ رخصة مدى الحياة مفعّلة"
+    override fun licenseYearStatus(date: String) = "✅ رخصة مفعّلة حتى $date"
+    override fun licenseExpiredStatus(date: String) = "⚠️ انتهت الرخصة في $date"
+    override fun licenseFreeLimitInfo(max: Int) =
+        "النسخة المجانية محدودة بـ $max أرانب إناث. فعّل الرخصة لإدارة عدد غير محدود (مع الحفاظ على كل بياناتك)."
+    override val licenseDeviceCode = "رمز جهازك"
+    override val licenseCopy = "نسخ"
+    override val licenseCopied = "تم نسخ الرمز!"
+    override val licenseOrderWhatsApp = "طلب التفعيل عبر واتساب (0770208626)"
+    override val licenseKeyLabel = "مفتاح التفعيل (LPN1...)"
+    override val licensePaste = "لصق"
+    override val licenseActivate = "تفعيل"
+    override val licenseManage = "إدارة الرخصة"
+    override val licenseSuccess = "✅ تم تفعيل الرخصة بنجاح! حساب غير محدود."
+    override val licenseErrFormat = "صيغة المفتاح غير صالحة."
+    override val licenseErrSignature = "مفتاح غير صالح أو تالف."
+    override val licenseErrDevice = "هذا المفتاح مخصص لجهاز آخر."
+    override val licenseErrExpired = "انتهت صلاحية هذا المفتاح."
 }

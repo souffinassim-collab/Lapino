@@ -417,6 +417,9 @@ fun SettingsDialog(
     farmName: String,
     isDark: Boolean,
     currentLang: AppLanguage,
+    licenseSummary: String = "",
+    isLicensed: Boolean = false,
+    onOpenLicense: () -> Unit = {},
     onFarmNameChange: (String) -> Unit,
     onToggleDark: () -> Unit,
     onLanguageChanged: (AppLanguage) -> Unit,
@@ -482,6 +485,24 @@ fun SettingsDialog(
                     }
                 }
                 Spacer(Modifier.height(14.dp))
+                if (licenseSummary.isNotBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isLicensed) MintContainer else BrandContainer)
+                            .clickable { onOpenLicense() }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(ms.licenseTitle, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (isLicensed) MintNursing else BrandPrimary)
+                            Text(licenseSummary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Text(ms.licenseManage, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = BrandPrimary)
+                    }
+                    Spacer(Modifier.height(14.dp))
+                }
                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                     Text(ms.close, fontWeight = FontWeight.Bold)
                 }

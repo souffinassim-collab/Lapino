@@ -7,11 +7,18 @@ echo   🐰 Compilation de l'APK Native Lapino (Kotlin/Compose)
 echo ========================================================
 echo.
 
-REM 1. Configuration automatique du JDK 17 ou 21
-if exist "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot\bin\java.exe" (
+REM 1. Configuration automatique du JDK 17 / 21 / Android Studio JBR
+if exist "C:\Program Files\Android\Android Studio\jbr\bin\java.exe" (
+    set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+) else if exist "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot\bin\java.exe" (
     set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
 ) else if exist "C:\Program Files\Java\jdk-21\bin\java.exe" (
     set "JAVA_HOME=C:\Program Files\Java\jdk-21"
+)
+if not defined JAVA_HOME (
+    echo [ERREUR] Aucun JDK trouve. Verifiez Android Studio ou JAVA_HOME.
+    pause
+    exit /b 1
 )
 echo [OK] JAVA_HOME : %JAVA_HOME%
 
