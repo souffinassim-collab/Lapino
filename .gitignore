@@ -1,54 +1,18 @@
-# ==========================================
-# Gradle & Android Build Artifacts
-# ==========================================
+# Gradle & Build
 .gradle/
 build/
 app/build/
-*/build/
 
-# Binaires et packages compilés
-*.apk
-*.aab
-*.ap_
-*.dex
-Lapino.apk
-
-# Configuration locale & machine (chemins absolus du SDK)
+# Configuration locale SDK
 local.properties
 
-# ==========================================
-# Environnements de développement / IDE
-# ==========================================
-# Android Studio & IntelliJ IDEA
-.idea/
-*.iml
-.navigation/
-captures/
-.externalNativeBuild/
-.cxx/
+# Packages générés
+*.apk
+*.aab
 
-# VS Code / Cursor
-.vscode/
-
-# ==========================================
-# Système d'exploitation & logs
-# ==========================================
-.DS_Store
-Thumbs.db
-*.log
-
-# ==========================================
-# Clés et certificats de signature
-# ==========================================
+# Clés de signature
 *.jks
 *.keystore
-*.p12
-*.p8
-*.key
 
-# Bases de données locales de test
-*.db
-*.sqlite
-
-# graft's local graph cache — regenerable, not committed (run `graft build`).
+# Cache local graft
 /graft/

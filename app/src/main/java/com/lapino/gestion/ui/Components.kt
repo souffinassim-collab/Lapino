@@ -352,12 +352,10 @@ fun ReproductionDialog(
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.matingTip)
                         MatingChecks(femelle)
-                        OutlinedTextField(
+                        QuickDateField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text(strings.inputMatingDate) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            label = strings.inputMatingDate
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -391,12 +389,10 @@ fun ReproductionDialog(
                         Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.palpationTip)
-                        OutlinedTextField(
+                        QuickDateField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text(strings.inputControlDate) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            label = strings.inputControlDate
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -443,12 +439,10 @@ fun ReproductionDialog(
                         Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.birthTip)
-                        OutlinedTextField(
+                        QuickDateField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text(strings.inputDeliveryDate) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            label = strings.inputDeliveryDate
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth()) {
@@ -497,12 +491,10 @@ fun ReproductionDialog(
                         Text(strings.rabbitIndicator(femelle.numero), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(10.dp))
                         CuniTipBox(strings.weaningTip)
-                        OutlinedTextField(
+                        QuickDateField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text(strings.inputWeaningDate) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
+                            label = strings.inputWeaningDate
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -624,6 +616,45 @@ fun CuniTipBox(text: String) {
             fontSize = 12.sp,
             lineHeight = 17.sp
         )
+    }
+}
+
+/** Champ de saisie de date ISO avec boutons rapides (-1j / Aujourd'hui / +1j) pour une saisie à une main. */
+@Composable
+fun QuickDateField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String
+) {
+    val ms = LocalAppStrings.current.menu
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                ms.btnMinusDay to { onValueChange(DateHelper.addDays(value, -1)) },
+                ms.btnToday to { onValueChange(DateHelper.todayIso()) },
+                ms.btnPlusDay to { onValueChange(DateHelper.addDays(value, 1)) }
+            ).forEach { (btnLabel, action) ->
+                OutlinedButton(
+                    onClick = action,
+                    modifier = Modifier.weight(1f).height(34.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                ) {
+                    Text(btnLabel, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 }
 

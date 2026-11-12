@@ -109,6 +109,7 @@ fun LapinoApp(
 
     // Navigation : "home" (tuiles) puis un écran par tuile
     var screen by remember { mutableStateOf("home") }
+    var femellesFilter by remember { mutableStateOf("all") }
     var selectedFemelleDetailId by remember { mutableStateOf<Long?>(null) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
     var farmName by remember { mutableStateOf(AppPrefs.farmName(context)) }
@@ -248,10 +249,17 @@ fun LapinoApp(
                         femelles = femelles,
                         onActionCycle = openCycleAction,
                         onOpenFemelle = { f -> selectedFemelleDetailId = f.id },
-                        onGoToStocks = { screen = "feed" }
+                        onGoToStocks = { screen = "feed" },
+                        onOpenFemalesFilter = { f ->
+                            femellesFilter = f
+                            screen = "femelles"
+                        }
                     )
                     "femelles" -> FemellesListTab(
                         femelles = femelles,
+                        reproAlerts = reproAlerts,
+                        filter = femellesFilter,
+                        onFilterChange = { femellesFilter = it },
                         onActionCycle = openCycleAction,
                         onOpenFemelle = { f -> selectedFemelleDetailId = f.id }
                     )
@@ -341,7 +349,24 @@ fun LapinoApp(
                         vaccineAlertsCount = vaccineAlerts.size,
                         lowFeedCount = alimentsBas.size,
                         salesTotal = ventes.sumOf { it.total },
-                        onOpen = { key -> screen = key },
+                        onOpen = { key ->
+                            if (key == "femelles") femellesFilter = "all"
+                            screen = key
+                        },
+                        onOpenFemalesFilter = { f ->
+                            femellesFilter = f
+                            screen = "femelles"
+                        },
+                        onQuickAction = { action ->
+                            when (action) {
+                                "new_female" -> {
+                                    editingFemelle = null
+                                    showAddEditFemelle = true
+                                }
+                                "new_sale" -> screen = "sales"
+                                "new_purchase" -> showPurchaseDialog = true
+                            }
+                        },
                         onOpenSettings = { showSettings = true }
                     )
                 }
@@ -471,7 +496,8 @@ fun DashboardTab(
     femelles: List<Femelle>,
     onActionCycle: (Femelle, String) -> Unit,
     onOpenFemelle: (Femelle) -> Unit,
-    onGoToStocks: () -> Unit
+    onGoToStocks: () -> Unit,
+    onOpenFemalesFilter: (String) -> Unit = {}
 ) {
     val strings = LocalAppStrings.current
 
@@ -500,19 +526,38 @@ fun DashboardTab(
             }
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Puces par phase
+            // Puces par phase (cliquables pour filtrer directement)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatusPill(strings.pillRest(stats.enRepos), Color(0xFFEEEEEE), Color(0xFF424242))
-                StatusPill(strings.pillMating(stats.enSaillie), PinkContainer, PinkSaillie)
-                StatusPill(strings.pillPregnant(stats.gestantes), BlueContainer, BlueGestante)
-                StatusPill(strings.pillNursing(stats.allaitantes), MintContainer, MintNursing)
+                StatusPill(strings.pillRest(stats.enRepos), Color(0xFFEEEEEE), Color(0xFF424242)) { onOpenFemalesFilter("repos") }
+                StatusPill(strings.pillMating(stats.enSaillie), PinkContainer, PinkSaillie) { onOpenFemalesFilter("saillie") }
+                StatusPill(strings.pillPregnant(stats.gestantes), BlueContainer, BlueGestante) { onOpenFemalesFilter("gestante") }
+                StatusPill(strings.pillNursing(stats.allaitantes), MintContainer, MintNursing) { onOpenFemalesFilter("allaitante") }
             }
             Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Bannière rassurante quand aucune alerte urgente n'est en cours
+        if (reproAlerts.isEmpty() && alimentsBas.isEmpty() && vaccineAlerts.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MintContainer)
+                ) {
+                    Text(
+                        text = strings.menu.allClearBanner,
+                        color = MintNursing,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
         }
 
         // 2. Alertes Cuniculicoles Prioritaires
@@ -707,15 +752,32 @@ fun DashboardTab(
 @Composable
 fun FemellesListTab(
     femelles: List<Femelle>,
+    reproAlerts: List<ReproAlert> = emptyList(),
+    filter: String = "all",
+    onFilterChange: (String) -> Unit = {},
     onActionCycle: (Femelle, String) -> Unit,
     onOpenFemelle: (Femelle) -> Unit
 ) {
     val strings = LocalAppStrings.current
+    val ms = strings.menu
     var search by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("all") }
+    var sortUrgent by remember { mutableStateOf(true) }
 
-    val filtered = remember(femelles, search, filter) {
-        femelles.filter { f ->
+    val alertPriorityByFemelle = remember(reproAlerts) {
+        reproAlerts.mapIndexed { idx, a -> a.femelle.id to idx }.toMap()
+    }
+
+    val counts = remember(femelles) {
+        mapOf(
+            "repos" to femelles.count { it.cycle == null },
+            "saillie" to femelles.count { it.cycle?.statut == "saillie" },
+            "gestante" to femelles.count { it.cycle?.statut == "gestante" },
+            "allaitante" to femelles.count { it.nursing != null }
+        )
+    }
+
+    val filtered = remember(femelles, search, filter, sortUrgent, alertPriorityByFemelle) {
+        val base = femelles.filter { f ->
             val matchQuery = search.isBlank() ||
                     f.numero.contains(search, ignoreCase = true) ||
                     (f.clapetNumero?.contains(search, ignoreCase = true) == true)
@@ -728,6 +790,11 @@ fun FemellesListTab(
             }
             matchQuery && matchFilter
         }
+        if (sortUrgent) {
+            base.sortedWith(compareBy({ alertPriorityByFemelle[it.id] ?: Int.MAX_VALUE }, { it.numero }))
+        } else {
+            base.sortedBy { it.numero }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -736,10 +803,18 @@ fun FemellesListTab(
             onValueChange = { search = it },
             placeholder = { Text(strings.searchPlaceholder) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (search.isNotEmpty()) {
+                    IconButton(onClick = { search = "" }) {
+                        Icon(Icons.Default.Clear, contentDescription = ms.resetFilters)
+                    }
+                }
+            },
             singleLine = true,
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
         Row(
@@ -749,32 +824,63 @@ fun FemellesListTab(
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            FilterChip(
+                selected = sortUrgent,
+                onClick = { sortUrgent = !sortUrgent },
+                label = { Text(if (sortUrgent) ms.sortUrgent else ms.sortName) }
+            )
             val filters = listOf(
                 "all" to strings.filterAll(femelles.size),
-                "repos" to strings.filterRest,
-                "saillie" to strings.filterMating,
-                "gestante" to strings.filterPregnant,
-                "allaitante" to strings.filterNursing
+                "repos" to "${strings.filterRest} (${counts["repos"] ?: 0})",
+                "saillie" to "${strings.filterMating} (${counts["saillie"] ?: 0})",
+                "gestante" to "${strings.filterPregnant} (${counts["gestante"] ?: 0})",
+                "allaitante" to "${strings.filterNursing} (${counts["allaitante"] ?: 0})"
             )
             filters.forEach { (key, label) ->
                 FilterChip(
                     selected = filter == key,
-                    onClick = { filter = key },
+                    onClick = { onFilterChange(key) },
                     label = { Text(label) }
                 )
             }
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 88.dp)
-        ) {
-            items(filtered, key = { it.id }) { femelle ->
-                RabbitStatusCard(
-                    femelle = femelle,
-                    onAction = onActionCycle,
-                    onCardClick = onOpenFemelle
-                )
+        if (filtered.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🔍", fontSize = 36.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = ms.noRabbitsMatch,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    if (search.isNotEmpty() || filter != "all") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        FilledTonalButton(onClick = {
+                            search = ""
+                            onFilterChange("all")
+                        }) {
+                            Text(ms.resetFilters)
+                        }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 88.dp)
+            ) {
+                items(filtered, key = { it.id }) { femelle ->
+                    RabbitStatusCard(
+                        femelle = femelle,
+                        onAction = onActionCycle,
+                        onCardClick = onOpenFemelle
+                    )
+                }
             }
         }
     }
@@ -1565,8 +1671,12 @@ fun SummaryStatCard(
 }
 
 @Composable
-fun StatusPill(label: String, bg: Color, fg: Color) {
-    Surface(color = bg, shape = RoundedCornerShape(20.dp)) {
+fun StatusPill(label: String, bg: Color, fg: Color, onClick: (() -> Unit)? = null) {
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(20.dp),
+        modifier = if (onClick != null) Modifier.clip(RoundedCornerShape(20.dp)).clickable { onClick() } else Modifier
+    ) {
         Text(
             text = label,
             color = fg,

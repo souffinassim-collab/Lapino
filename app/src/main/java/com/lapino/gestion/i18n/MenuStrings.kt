@@ -115,6 +115,19 @@ interface MenuStrings {
 
     // Conseils
     val tips: List<Pair<String, String>>
+
+    // Ergonomie & actions rapides
+    val quickNewFemale: String
+    val quickNewSale: String
+    val quickNewPurchase: String
+    val sortUrgent: String
+    val sortName: String
+    val resetFilters: String
+    val noRabbitsMatch: String
+    val allClearBanner: String
+    val btnMinusDay: String
+    val btnToday: String
+    val btnPlusDay: String
 }
 
 val AppStrings.menu: MenuStrings
@@ -246,6 +259,18 @@ object MenuStringsFR : MenuStrings {
         "🌾 Aliment et eau" to "Eau propre à volonté, toute la journée. Une lapine allaitante mange et boit deux à trois fois plus qu'au repos.",
         "🧼 Hygiène" to "Nettoyez et désinfectez cages et boîtes à nid entre chaque portée. Une bonne aération sans courant d'air limite les maladies."
     )
+
+    override val quickNewFemale = "+ Lapine"
+    override val quickNewSale = "+ Vente"
+    override val quickNewPurchase = "+ Aliment"
+    override val sortUrgent = "🔥 Urgentes"
+    override val sortName = "🔤 Nom"
+    override val resetFilters = "Réinitialiser"
+    override val noRabbitsMatch = "Aucune lapine ne correspond à la recherche."
+    override val allClearBanner = "🎉 Tout est à jour — aucune alerte urgente aujourd'hui."
+    override val btnMinusDay = "-1j"
+    override val btnToday = "Aujourd'hui"
+    override val btnPlusDay = "+1j"
 }
 
 object MenuStringsAR : MenuStrings {
@@ -370,4 +395,16 @@ object MenuStringsAR : MenuStrings {
         "🌾 العلف والماء" to "ماء نظيف متوفر طوال اليوم. الأنثى المرضعة تأكل وتشرب ضعفين إلى ثلاثة أضعاف.",
         "🧼 النظافة" to "نظّف وعقّم الأقفاص وصناديق الولادة بين كل ولادة. التهوية الجيدة دون تيار هواء تقلل الأمراض."
     )
+
+    override val quickNewFemale = "+ أرنبة"
+    override val quickNewSale = "+ بيع"
+    override val quickNewPurchase = "+ علف"
+    override val sortUrgent = "🔥 عاجلة"
+    override val sortName = "🔤 الاسم"
+    override val resetFilters = "إعادة تعيين"
+    override val noRabbitsMatch = "لا توجد أرنبة مطابقة للبحث."
+    override val allClearBanner = "🎉 كل شيء محدّث — لا توجد مهام عاجلة اليوم."
+    override val btnMinusDay = "-1 يوم"
+    override val btnToday = "اليوم"
+    override val btnPlusDay = "+1 يوم"
 }

@@ -113,6 +113,8 @@ fun HomeScreen(
     lowFeedCount: Int,
     salesTotal: Double,
     onOpen: (String) -> Unit,
+    onOpenFemalesFilter: (String) -> Unit = {},
+    onQuickAction: (String) -> Unit = {},
     onOpenSettings: () -> Unit
 ) {
     val ms = LocalAppStrings.current.menu
@@ -236,15 +238,45 @@ fun HomeScreen(
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeroChip("💞", stats.enSaillie)
-                    HeroChip("🤰", stats.gestantes)
-                    HeroChip("🍼", stats.allaitantes)
-                    HeroChip("😴", stats.enRepos)
+                    HeroChip("💞", stats.enSaillie) { onOpenFemalesFilter("saillie") }
+                    HeroChip("🤰", stats.gestantes) { onOpenFemalesFilter("gestante") }
+                    HeroChip("🍼", stats.allaitantes) { onOpenFemalesFilter("allaitante") }
+                    HeroChip("😴", stats.enRepos) { onOpenFemalesFilter("repos") }
                 }
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(14.dp))
+
+        // Actions rapides en 1 geste
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            QuickActionPill(
+                label = ms.quickNewFemale,
+                icon = Icons.Default.Add,
+                tint = Color(0xFFEC4899),
+                modifier = Modifier.weight(1f),
+                onClick = { onQuickAction("new_female") }
+            )
+            QuickActionPill(
+                label = ms.quickNewSale,
+                icon = Icons.Default.Payments,
+                tint = Color(0xFFEF4444),
+                modifier = Modifier.weight(1f),
+                onClick = { onQuickAction("new_sale") }
+            )
+            QuickActionPill(
+                label = ms.quickNewPurchase,
+                icon = Icons.Default.ShoppingCart,
+                tint = Color(0xFF10B981),
+                modifier = Modifier.weight(1f),
+                onClick = { onQuickAction("new_purchase") }
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
 
         // Grille de tuiles (ordre du croquis)
         tiles.chunked(2).forEachIndexed { rowIndex, row ->
@@ -265,11 +297,12 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeroChip(emoji: String, count: Int) {
+private fun HeroChip(emoji: String, count: Int, onClick: () -> Unit) {
     Row(
         modifier = Modifier
+            .pressScale(onClick = onClick)
             .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.2f))
+            .background(Color.White.copy(alpha = 0.22f))
             .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(50))
             .padding(horizontal = 11.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -277,6 +310,34 @@ private fun HeroChip(emoji: String, count: Int) {
         Text(emoji, fontSize = 14.sp)
         Spacer(Modifier.width(5.dp))
         Text(count.toString(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+    }
+}
+
+@Composable
+private fun QuickActionPill(
+    label: String,
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    GlassCard(modifier = modifier.height(44.dp), shape = RoundedCornerShape(16.dp), onClick = onClick) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = label,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
